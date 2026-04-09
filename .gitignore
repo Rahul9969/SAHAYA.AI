@@ -37,9 +37,8 @@ Thumbs.db
 **/*.pyc
 **/.pytest_cache/
 
-# User Exclusions
-.claude/
-Auto_Jobs_Applier_AI_Agent/
-Job-apply-AI-agent/
+# Local / hackathon scratch folders
+job-apply-AI-agent/
 PICT-HACKATHON/
-CLAUDE.md
+skill-path-finder-58/
+
