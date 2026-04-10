@@ -599,7 +599,7 @@ Return STRICT JSON only with this exact shape:
     }]
   },
   "final": {
-    "language": "javascript",
+    "language": "python",
     "code": "string",
     "complexity": { "time": "string", "space": "string", "explain": "string" },
     "similar": [{ "title": "string", "pattern": "string" }]
@@ -615,7 +615,8 @@ FETCHED (optional):
 ${fetched ? JSON.stringify(fetched).slice(0, 18000) : '(none)'}
 
 If fetched.contentHtml exists, extract clean text problem statement, constraints, and examples from it.
-Then pick the best pattern, produce an accurate step-by-step visualization script for example #1, and produce the optimal JS solution.`;
+Then pick the best pattern, produce an accurate step-by-step visualization script for example #1, and produce the optimal Python solution.
+CRITICAL: At the end of the Python code, you MUST append a driver block that assigns sample inputs from example #1, calls the optimal solution function/method on those inputs, and prints the result, so the code is fully runnable and self-contained.`;
 
   try {
     const analysis = await callGeminiStructuredJSON(system, prompt, 3500);
@@ -626,6 +627,54 @@ Then pick the best pattern, produce an accurate step-by-step visualization scrip
     res.json(analysis);
   } catch (e) {
     res.status(500).json({ error: e.message || 'Failed to analyze problem' });
+  }
+});
+
+router.post('/visualizer/trace', authMiddleware, async (req, res) => {
+  const { code, language = 'python' } = req.body || {};
+  if (!code) return res.status(400).json({ error: 'code is required' });
+  if (language.toLowerCase() !== 'python') {
+    return res.status(400).json({ error: 'Only Python is supported for deterministic tracing.' });
+  }
+
+  try {
+    const scriptPath = path.join(process.cwd(), 'ai_service', 'tracer.py');
+    const pyBin = process.env.PYTHON_BIN || 'python';
+    
+    const child = spawn(pyBin, [scriptPath], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    let outStr = '';
+    let errStr = '';
+
+    child.stdout.on('data', (d) => { outStr += String(d || ''); });
+    child.stderr.on('data', (d) => { errStr += String(d || ''); });
+
+    child.stdin.write(JSON.stringify({ code }));
+    child.stdin.end();
+
+    child.on('close', (codeStatus) => {
+      if (codeStatus !== 0 && !outStr) {
+        return res.status(500).json({ error: errStr || `Tracer exited with code ${codeStatus}` });
+      }
+      try {
+        const parsed = JSON.parse(outStr || '{}');
+        if (parsed.error) {
+             return res.status(400).json(parsed);
+        }
+        res.json(parsed);
+      } catch (e) {
+        res.status(500).json({ error: 'Failed to parse tracer output' });
+      }
+    });
+
+    child.on('error', (e) => {
+      res.status(500).json({ error: e.message || 'Failed to start tracer process' });
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to trace execution' });
   }
 });
 

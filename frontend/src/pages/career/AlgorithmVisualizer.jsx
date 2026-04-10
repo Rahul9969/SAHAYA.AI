@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pause, Play, RefreshCw, StepBack, StepForward, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { Pause, Play, RefreshCw, StepBack, StepForward, Volume2, VolumeX, Sparkles, Activity } from 'lucide-react';
 import api from '../../utils/api';
+import ExecutionAnimator from '../../components/ExecutionAnimator';
 
 const SPEEDS = [
   { label: '0.25x', ms: 1400 },
@@ -397,6 +398,9 @@ export default function AlgorithmVisualizer() {
   const [recentQueries, setRecentQueries] = useState(readRecent);
   const [voiceCache, setVoiceCache] = useState({});
 
+  const [isTracing, setIsTracing] = useState(false);
+  const [executionTrace, setExecutionTrace] = useState(null);
+
   const steps = data?.visualization?.steps || [];
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -489,6 +493,8 @@ export default function AlgorithmVisualizer() {
     setIdx(0);
     setPlaying(false);
     setVoiceCache({});
+    setExecutionTrace(null);
+    setIsTracing(false);
     try {
       const res = await api.post('/career/visualizer/analyze', { input });
       setData(sanitizeAnalysis(res.data));
@@ -499,6 +505,24 @@ export default function AlgorithmVisualizer() {
       setErr(e?.response?.data?.error || e?.message || 'Failed to analyze problem.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTraceExecution = async () => {
+    if (!data?.final?.code || isTracing) return;
+    setIsTracing(true);
+    try {
+      const res = await api.post('/career/visualizer/trace', {
+        code: data.final.code,
+        language: data.final.language || 'javascript',
+      });
+      setExecutionTrace(res.data);
+    } catch (e) {
+      console.error('Failed to parse trace:', e);
+      // Fallback object to show failure state
+      setExecutionTrace({ steps: [], finalOutput: 'Error tracing execution' });
+    } finally {
+      setIsTracing(false);
     }
   };
 
@@ -760,10 +784,107 @@ export default function AlgorithmVisualizer() {
 
       {data?.final ? (
         <div className="career-card">
-          <div className="font-semibold">Optimal solution</div>
-          <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 overflow-x-auto">
-            <pre className="text-sm text-white/80 whitespace-pre">{data.final.code}</pre>
+          <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+            <div className="font-semibold text-lg flex items-center gap-2">
+              <Sparkles size={18} className="text-cyan-400" /> Optimal solution
+            </div>
+            <div className="flex space-x-2 items-center">
+              {isTracing ? (
+                 <button
+                   type="button"
+                   onClick={() => setIsTracing(false)}
+                   className="career-btn !bg-neutral-500/20 hover:!bg-neutral-500/30 !text-neutral-300"
+                 >
+                   Exit Tracer
+                 </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsTracing(true)}
+                  className="career-btn !bg-cyan-500/20 hover:!bg-cyan-500/30 !text-cyan-300 !border-cyan-500/30"
+                >
+                  <Play size={16} /> Trace Code Execution
+                </button>
+              )}
+            </div>
           </div>
+          
+          {isTracing ? (
+             <div className="mt-3 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                         <span className="font-semibold">Code Input</span>
+                         <span className="text-[10px] tracking-wider font-bold bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded uppercase">Python Only</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const sample = `def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n\ndef fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n - 1) + fibonacci(n - 2)\n\nresult = factorial(5)\nfib_result = fibonacci(6)\nprint(f"Factorial: {result}, Fibonacci: {fib_result}")`;
+                            // Quick hack to set the text area
+                            const el = document.getElementById('tracer-code-input');
+                            if (el) el.value = sample;
+                          }}
+                          className="text-xs text-white/50 hover:text-white transition-colors px-2 py-1"
+                        >
+                          Load Sample
+                        </button>
+                        <button
+                           onClick={async () => {
+                              const el = document.getElementById('tracer-code-input');
+                              if (!el || !el.value.trim()) return;
+                              
+                              // Create loading state directly using existing trace logic
+                              try {
+                                  setExecutionTrace({ steps: [], generating: true }); // temporary flag we can check
+                                  const res = await api.post('/career/visualizer/trace', {
+                                      code: el.value,
+                                      language: 'python',
+                                  });
+                                  setExecutionTrace(res.data);
+                                  // remove generating flag
+                              } catch (e) {
+                                  setExecutionTrace({ steps: [], finalOutput: 'Error: ' + String(e) });
+                              }
+                           }}
+                           className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded font-medium flex items-center gap-1 transition-colors"
+                        >
+                           <Activity size={12} /> Visualize
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex flex-col lg:flex-row gap-4 h-[600px]">
+                    <div className="w-full lg:w-5/12 h-full rounded-xl border border-white/10 bg-black/40 overflow-hidden relative">
+                         <textarea
+                            id="tracer-code-input"
+                            defaultValue={data.final.code || ''}
+                            spellCheck="false"
+                            className="w-full h-full p-4 bg-transparent text-sm text-white/80 font-mono resize-none focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                            placeholder="Write Python code here to trace..."
+                         />
+                    </div>
+                    <div className="w-full lg:w-7/12 h-full flex flex-col">
+                       {executionTrace?.generating ? (
+                           <div className="flex-1 flex items-center justify-center border border-white/10 rounded-xl bg-black/40">
+                              <Activity className="animate-spin text-orange-400" size={32} />
+                           </div>
+                       ) : executionTrace ? (
+                           <div className="flex-1 overflow-hidden">
+                               <ExecutionAnimator trace={executionTrace} code={document.getElementById('tracer-code-input')?.value || data.final.code} />
+                           </div>
+                       ) : (
+                           <div className="flex-1 flex items-center justify-center border border-white/10 rounded-xl bg-black/40 text-white/40 text-sm">
+                               Click Visualize to trace execution
+                           </div>
+                       )}
+                    </div>
+                </div>
+             </div>
+          ) : (
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 overflow-x-auto relative group">
+              <pre className="text-sm text-white/80 whitespace-pre">{data.final.code}</pre>
+            </div>
+          )}
           <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <div className="font-semibold">Complexity</div>
