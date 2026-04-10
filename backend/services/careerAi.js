@@ -85,45 +85,82 @@ function safeParseJSON(raw) {
   }
 }
 
+function isRetryableStatus(status) {
+  return status === 429 || status === 500 || status === 503;
+}
+
+function isRetryableBody(message = '') {
+  const m = String(message || '').toLowerCase();
+  return m.includes('high demand') || m.includes('overloaded') || m.includes('temporar') || m.includes('rate limit');
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** Gemini only (no Groq) — document understanding + strict JSON. */
 export async function callGeminiStructuredJSON(systemPrompt, userPrompt, maxTokens = 2048) {
   const key = getGeminiKey();
-  if (!key) throw new Error('Missing GEMINI_API_KEY for structured analysis');
-
+  const groqAvailable = Boolean(getGroqKey());
   const model = getGeminiModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-      generationConfig: {
-        maxOutputTokens: maxTokens,
-        temperature: 0.25,
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
+  let lastErr = '';
 
-  if (!response.ok) {
-    const body = await readErrorBody(response);
-    throw new Error(`Gemini API Error: ${body}`);
+  if (key) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            temperature: 0.25,
+            responseMimeType: 'application/json',
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') ?? '';
+        const parsed = safeParseJSON(raw);
+        if (parsed) return parsed;
+
+        const repair = await callGroqChat(
+          'You output only valid JSON. No markdown.',
+          `Fix to valid JSON only:\n${raw}`,
+          { maxTokens: 1200, jsonMode: true },
+        ).catch(() => null);
+        const again = repair ? safeParseJSON(repair) : null;
+        if (again) return again;
+        lastErr = 'Gemini returned non-JSON output.';
+        break;
+      }
+
+      const body = await readErrorBody(response);
+      lastErr = `Gemini API Error: ${body}`;
+      if ((isRetryableStatus(response.status) || isRetryableBody(body)) && attempt < 2) {
+        await sleep((attempt + 1) * 1200);
+        continue;
+      }
+      break;
+    }
+  } else {
+    lastErr = 'Missing GEMINI_API_KEY for structured analysis';
   }
 
-  const data = await response.json();
-  const raw = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') ?? '';
-  const parsed = safeParseJSON(raw);
-  if (parsed) return parsed;
+  if (groqAvailable) {
+    const raw = await callGroqChat(
+      `${systemPrompt}\n\nReturn valid JSON only.`,
+      userPrompt,
+      { maxTokens, jsonMode: true },
+    );
+    const parsed = safeParseJSON(raw);
+    if (parsed) return parsed;
+  }
 
-  const repair = await callGroqChat(
-    'You output only valid JSON. No markdown.',
-    `Fix to valid JSON only:\n${raw}`,
-    { maxTokens: 1200, jsonMode: true },
-  ).catch(() => null);
-
-  const again = repair ? safeParseJSON(repair) : null;
-  if (again) return again;
-  throw new Error('Gemini returned non-JSON output.');
+  throw new Error(lastErr || 'Structured AI is temporarily unavailable. Please try again.');
 }
 
 /** Plain text from Gemini (resume extraction, long-form parsing). */

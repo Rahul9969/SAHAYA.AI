@@ -1,17 +1,17 @@
 import express from 'express';
 import { randomUUID } from 'crypto';
 import vm from 'vm';
+import * as cheerio from 'cheerio';
 import { authMiddleware } from '../middleware/auth.js';
 import { callGroqChat, callGroqChatJSON, callGeminiStructuredJSON } from '../services/careerAi.js';
 import { ragRetrieve } from '../services/ragLocal.js';
 import { tavilySearch } from '../services/tavily.js';
-import { findAll, findOne, insertOne, upsertOne, updateOne } from '../middleware/db.js';
+import { findAll, findOne, insertOne, updateOne } from '../middleware/db.js';
+import { awardXp, getOrCreateGamification, incrementQuest, WORLDS } from '../services/gamificationCore.js';
 
 const router = express.Router();
 
-const COL_PROFILE = 'career_profile';
 const COL_ATTEMPTS = 'career_problem_attempts';
-const COL_TOPIC_STATE = 'career_topic_state';
 const COL_ROOMS = 'career_rooms';
 const COL_INTERVIEWS = 'career_interviews';
 const COL_RESUME = 'career_resume_intel';
@@ -20,50 +20,6 @@ const COL_APP_KIT = 'career_application_kits';
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function computeLevel(xp) {
-  // simple curve: every 250xp = +1 level
-  return Math.max(1, Math.floor((xp || 0) / 250) + 1);
-}
-
-function dayKey(d = new Date()) {
-  return d.toISOString().slice(0, 10);
-}
-
-async function getOrInitProfile(userId) {
-  const existing = await findOne(COL_PROFILE, (p) => p.userId === userId);
-  if (existing) return existing;
-  const profile = { id: userId, userId, xp: 0, level: 1, streak: 0, lastActiveDate: null, createdAt: nowIso(), updatedAt: nowIso() };
-  await insertOne(COL_PROFILE, profile);
-  return profile;
-}
-
-async function awardXpAndStreak(userId, deltaXp) {
-  const profile = await getOrInitProfile(userId);
-  const today = dayKey();
-  const last = profile.lastActiveDate;
-  let streak = profile.streak || 0;
-  if (!last) streak = 1;
-  else {
-    const lastDate = new Date(last);
-    const diffDays = Math.floor((new Date(today) - new Date(dayKey(lastDate))) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) {
-      // same day, keep streak
-    } else if (diffDays === 1) {
-      streak += 1;
-    } else {
-      streak = 1;
-    }
-  }
-  const xp = (profile.xp || 0) + (deltaXp || 0);
-  const level = computeLevel(xp);
-  const updated = await updateOne(
-    COL_PROFILE,
-    (p) => p.userId === userId,
-    { xp, level, streak, lastActiveDate: today, updatedAt: nowIso() },
-  );
-  return updated || { ...profile, xp, level, streak, lastActiveDate: today, updatedAt: nowIso() };
 }
 
 function seedProblems() {
@@ -198,37 +154,13 @@ function runJsTests(problem, code) {
   return { passed, total: results.length, results };
 }
 
-function conceptMapSeed() {
-  return {
-    nodes: [
-      { id: 'arrays', label: 'Arrays', description: 'Core iteration, indexing, prefix sums.', x: 140, y: 110 },
-      { id: 'hashing', label: 'Hashing', description: 'Maps/sets for \(O(1)\) lookups.', x: 320, y: 110 },
-      { id: 'two-pointers', label: 'Two pointers', description: 'Inward/outward pointer patterns.', x: 500, y: 110 },
-      { id: 'stacks', label: 'Stacks', description: 'Monotonic stack, parsing, next greater.', x: 230, y: 250 },
-      { id: 'binary-search', label: 'Binary search', description: 'Search on answer; invariants.', x: 410, y: 250 },
-      { id: 'graphs', label: 'Graphs', description: 'BFS/DFS, shortest paths.', x: 620, y: 250 },
-      { id: 'dp', label: 'DP', description: 'Optimal substructure; transitions.', x: 740, y: 120 },
-    ],
-    edges: [
-      { from: 'arrays', to: 'hashing' },
-      { from: 'arrays', to: 'two-pointers' },
-      { from: 'hashing', to: 'stacks' },
-      { from: 'two-pointers', to: 'binary-search' },
-      { from: 'binary-search', to: 'graphs' },
-      { from: 'graphs', to: 'dp' },
-    ],
-  };
-}
-
-function computeReadiness(attempts, topicState) {
-  // Minimal but meaningful score: pass rate + volume + topic completions
+function computeReadiness(attempts) {
+  // Minimal but meaningful score: pass rate + volume
   const total = attempts.length;
   const passed = attempts.filter((a) => a.result === 'pass').length;
   const passRate = total ? passed / total : 0;
   const volume = Math.min(1, total / 20);
-  const completedTopics = topicState.filter((t) => t.status === 'mastered' || t.status === 'completed').length;
-  const topicFactor = Math.min(1, completedTopics / 8);
-  const score = Math.round((passRate * 55 + volume * 25 + topicFactor * 20));
+  const score = Math.round(passRate * 70 + volume * 30);
   return Math.max(0, Math.min(100, score));
 }
 
@@ -250,15 +182,46 @@ function weakTopicsFromAttempts(attempts) {
 
 router.get('/dashboard', authMiddleware, async (req, res) => {
   const userId = req.userId;
-  const profile = await getOrInitProfile(userId);
+  const profile = await getOrCreateGamification(userId);
   const attempts = (await findAll(COL_ATTEMPTS, (a) => a.userId === userId))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 10);
-  const topicState = await findAll(COL_TOPIC_STATE, (t) => t.userId === userId);
-  const readinessScore = computeReadiness(await findAll(COL_ATTEMPTS, (a) => a.userId === userId), topicState);
+  const readinessScore = computeReadiness(await findAll(COL_ATTEMPTS, (a) => a.userId === userId));
   const weakTopics = weakTopicsFromAttempts(attempts);
   const dailyChallenge = { id: 'two-sum', title: 'Two Sum (Daily)', bonusXp: 35 };
   res.json({ profile, readinessScore, weakTopics, recentAttempts: attempts, dailyChallenge });
+});
+
+router.get('/analytics/summary', authMiddleware, async (req, res) => {
+  const userId = req.userId;
+  const allAttempts = await findAll(COL_ATTEMPTS, (a) => a.userId === userId);
+  const interviews = await findAll(COL_INTERVIEWS, (a) => a.userId === userId);
+  const visualizerRuns = await findAll('career_visualizer_runs', (a) => a.userId === userId);
+  const profile = await getOrCreateGamification(userId);
+  const readinessScore = computeReadiness(allAttempts);
+  const submissions = allAttempts.filter((a) => a.kind === 'submit');
+  const passed = submissions.filter((a) => a.result === 'pass').length;
+  const passRate = submissions.length ? Math.round((passed / submissions.length) * 100) : 0;
+  const sessions = [...submissions, ...interviews, ...visualizerRuns]
+    .map((x) => x.createdAt)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b) - new Date(a));
+  res.json({
+    world: 'career',
+    profile,
+    usage: {
+      attempts: submissions.length,
+      interviewSessions: interviews.length,
+      visualizerRuns: visualizerRuns.length,
+      totalTrackedActions: submissions.length + interviews.length + visualizerRuns.length,
+      lastActiveAt: sessions[0] || null,
+    },
+    learning: {
+      readinessScore,
+      passRate,
+      weakTopics: weakTopicsFromAttempts(allAttempts).slice(0, 4),
+    },
+  });
 });
 
 router.get('/problems', authMiddleware, async (_req, res) => {
@@ -332,7 +295,8 @@ router.post('/attempts/submit', authMiddleware, async (req, res) => {
     const forcedPass = judge && judge.total > 0 && judge.passed === judge.total;
     const result = forcedPass ? 'pass' : (review?.result === 'pass' ? 'pass' : 'try');
     const xpDelta = result === 'pass' ? 45 : 10;
-    const profile = await awardXpAndStreak(userId, xpDelta);
+    const profile = await awardXp(userId, xpDelta, 'career_attempt_submit', { world: WORLDS.career });
+    await incrementQuest(userId, WORLDS.career, 'career_attempts', 1);
 
     const attempt = {
       id: randomUUID(),
@@ -372,27 +336,6 @@ router.post('/attempts/run', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/concept-map', authMiddleware, async (req, res) => {
-  const userId = req.userId;
-  const seed = conceptMapSeed();
-  const states = await findAll(COL_TOPIC_STATE, (t) => t.userId === userId);
-  const mapState = new Map(states.map((s) => [s.topicId, s.status]));
-  const nodes = seed.nodes.map((n) => ({ ...n, status: mapState.get(n.id) || 'not_started' }));
-  res.json({ nodes, edges: seed.edges });
-});
-
-router.post('/concept-map/state', authMiddleware, async (req, res) => {
-  const userId = req.userId;
-  const { topicId, status } = req.body || {};
-  if (!topicId || !status) return res.status(400).json({ error: 'topicId and status required' });
-  const allowed = new Set(['not_started', 'learning', 'mastered', 'review', 'completed']);
-  if (!allowed.has(status)) return res.status(400).json({ error: 'Invalid status' });
-
-  const doc = { id: `${userId}__${topicId}`, userId, topicId, status, updatedAt: nowIso() };
-  await upsertOne(COL_TOPIC_STATE, (t) => t.userId === userId && t.topicId === topicId, doc);
-  res.json({ ok: true });
-});
-
 // Visualizer AI narration helper (optional)
 router.post('/visualizer/explain-step', authMiddleware, async (req, res) => {
   const { algoName, step } = req.body || {};
@@ -404,6 +347,157 @@ router.post('/visualizer/explain-step', authMiddleware, async (req, res) => {
     res.json({ explanation });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+function findFirst(obj, predicate, depth = 0) {
+  if (!obj || depth > 10) return null;
+  if (predicate(obj)) return obj;
+  if (Array.isArray(obj)) {
+    for (const v of obj) {
+      const r = findFirst(v, predicate, depth + 1);
+      if (r) return r;
+    }
+    return null;
+  }
+  if (typeof obj === 'object') {
+    for (const k of Object.keys(obj)) {
+      const r = findFirst(obj[k], predicate, depth + 1);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+
+async function tryFetchLeetCode(url) {
+  const u = String(url || '').trim();
+  if (!u.includes('leetcode.com/problems/')) return null;
+  const res = await fetch(u, {
+    headers: {
+      'user-agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36',
+      accept: 'text/html,application/xhtml+xml',
+    },
+  });
+  if (!res.ok) return null;
+  const html = await res.text();
+  const $ = cheerio.load(html);
+  const title = ($('title').text() || '').replace(/\s+-\s+LeetCode\s*$/, '').trim();
+
+  const nextDataRaw = $('#__NEXT_DATA__').text();
+  let contentHtml = '';
+  let constraintsText = '';
+  let exampleText = '';
+  if (nextDataRaw) {
+    try {
+      const nextData = JSON.parse(nextDataRaw);
+      const q = findFirst(
+        nextData,
+        (x) =>
+          x &&
+          typeof x === 'object' &&
+          typeof x.content === 'string' &&
+          typeof x.title === 'string' &&
+          (typeof x.titleSlug === 'string' || typeof x.questionId === 'string'),
+      );
+      contentHtml = String(q?.content || '');
+      // constraints/examples are embedded inside content; keep raw HTML and let AI extract reliably.
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback: use visible text; it's imperfect but better than nothing.
+  if (!contentHtml) {
+    const meta = $('meta[name="description"]').attr('content') || '';
+    contentHtml = meta ? `<p>${meta}</p>` : '';
+  }
+
+  return {
+    source: 'leetcode',
+    url: u,
+    title: title || null,
+    contentHtml: contentHtml || null,
+    constraintsText: constraintsText || null,
+    examplesText: exampleText || null,
+  };
+}
+
+router.post('/visualizer/analyze', authMiddleware, async (req, res) => {
+  const userId = req.userId;
+  const raw = String(req.body?.input || '').trim();
+  if (!raw) return res.status(400).json({ error: 'input is required' });
+
+  let fetched = null;
+  try {
+    fetched = await tryFetchLeetCode(raw);
+  } catch (e) {
+    console.warn('leetcode fetch failed:', e?.message);
+    fetched = null;
+  }
+
+  const system = `You are an expert DSA teacher.
+Return STRICT JSON only with this exact shape:
+{
+  "problem": {
+    "title": "string",
+    "description": "string",
+    "constraints": ["string"],
+    "examples": [{ "input": "string", "output": "string", "explanation": "string" }]
+  },
+  "pattern": {
+    "name": "string",
+    "ruleOfThumb": "string",
+    "whenToUse": ["string"],
+    "approach": ["string"],
+    "recognitionHints": ["string"]
+  },
+  "visualization": {
+    "primaryStructure": "array"|"linked_list"|"tree"|"graph"|"dp"|"stack"|"queue"|"sorting"|"mixed",
+    "steps": [{
+      "label": "string",
+      "stepText": "string",
+      "voiceText": "string",
+      "state": {
+        "array": [{"value": "string", "highlight": "none"|"active"|"compare"|"swap"|"window"}],
+        "pointers": [{ "name":"string", "index": number, "color":"string" }],
+        "window": { "l": number, "r": number, "ok": boolean },
+        "stack": ["string"],
+        "queue": ["string"],
+        "dpGrid": { "rows": number, "cols": number, "cells": [{"r":number,"c":number,"value":"string","highlight":"none"|"active"|"done"}] },
+        "graph": { "nodes":[{"id":"string","label":"string","state":"idle"|"frontier"|"visited"|"active"}], "edges":[{"from":"string","to":"string"}], "active":"string" },
+        "tree": { "nodes":[{"id":"string","label":"string","state":"idle"|"active"|"visited"}], "edges":[{"from":"string","to":"string"}], "active":"string" }
+      }
+    }]
+  },
+  "final": {
+    "language": "javascript",
+    "code": "string",
+    "complexity": { "time": "string", "space": "string", "explain": "string" },
+    "similar": [{ "title": "string", "pattern": "string" }]
+  }
+}
+Rules:
+- voiceText must teach WHY, stepText states WHAT (keep them different).
+- steps must be accurate for ONE chosen example (use first example).
+- Keep steps <= 60 for performance.`;
+
+  const prompt = `INPUT (URL or name): ${raw}
+FETCHED (optional):
+${fetched ? JSON.stringify(fetched).slice(0, 18000) : '(none)'}
+
+If fetched.contentHtml exists, extract clean text problem statement, constraints, and examples from it.
+Then pick the best pattern, produce an accurate step-by-step visualization script for example #1, and produce the optimal JS solution.`;
+
+  try {
+    const analysis = await callGeminiStructuredJSON(system, prompt, 3500);
+    // lightweight progress XP
+    await insertOne('career_visualizer_runs', { id: randomUUID(), userId, input: raw, createdAt: nowIso(), analysis });
+    await awardXp(userId, 8, 'career_visualizer_run', { world: WORLDS.career });
+    await incrementQuest(userId, WORLDS.career, 'career_visualizer_runs', 1);
+    res.json(analysis);
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to analyze problem' });
   }
 });
 
@@ -594,40 +688,8 @@ Derive questionReviews from the assistant questions in the conversation (summari
   }
   await updateOne(COL_INTERVIEWS, (s) => s.id === sessionId && s.userId === userId, { assessment, updatedAt: nowIso() });
   // reward completion
-  await awardXpAndStreak(userId, 20);
+  await awardXp(userId, 20, 'career_interview_complete', { world: WORLDS.career });
   res.json({ assessment });
-});
-
-router.post('/concept-map/lesson', authMiddleware, async (req, res) => {
-  const userId = req.userId;
-  const { topicId, label } = req.body || {};
-  if (!topicId) return res.status(400).json({ error: 'topicId required' });
-  const seed = conceptMapSeed();
-  const node = seed.nodes.find((n) => n.id === topicId);
-  const title = label || node?.label || topicId;
-  const q = `${title} ${node?.description || ''}`.trim();
-
-  let chunks = [];
-  try {
-    chunks = await ragRetrieve(q, { mode: 'topics', k: 4 });
-  } catch (e) {
-    console.warn('concept lesson RAG:', e?.message);
-  }
-  const context = chunks.length
-    ? chunks.map((c, i) => `SOURCE ${i + 1}:\n${c.text}`).join('\n\n')
-    : node?.description || '';
-
-  const system = `You are a concise DSA/career tutor. Teach from CONTEXT; if CONTEXT is thin, use standard knowledge but say so briefly.
-Return plain text: 4-6 short paragraphs with bullets where useful. No markdown code fences.`;
-  const prompt = `Topic: ${title}\n\nCONTEXT:\n${context.slice(0, 12000)}\n\nWrite the mini-lesson.`;
-
-  try {
-    const lesson = await callGroqChat(system, prompt, { maxTokens: 900 });
-    await awardXpAndStreak(userId, 5);
-    res.json({ lesson, sources: chunks.map((c) => c.source || c.path).filter(Boolean) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
 });
 
 router.post('/resume/analyze', authMiddleware, async (req, res) => {
@@ -656,7 +718,7 @@ router.post('/resume/analyze', authMiddleware, async (req, res) => {
       createdAt: nowIso(),
     };
     await insertOne(COL_RESUME, row);
-    await awardXpAndStreak(userId, 15);
+    await awardXp(userId, 15, 'career_resume_analyze', { world: WORLDS.career });
     res.json({ analysis, savedId: row.id });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -713,7 +775,7 @@ router.post('/resume/jd-scan', authMiddleware, async (req, res) => {
     const scan = await callGeminiStructuredJSON(system, prompt, 3000);
     const row = { id: randomUUID(), userId, scan, createdAt: nowIso() };
     await insertOne(COL_JD, row);
-    await awardXpAndStreak(userId, 12);
+    await awardXp(userId, 12, 'career_jd_scan', { world: WORLDS.career });
     res.json({ scan, savedId: row.id });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -769,7 +831,7 @@ ${resume}
       createdAt: nowIso(),
     };
     await insertOne(COL_APP_KIT, row);
-    await awardXpAndStreak(userId, 18);
+    await awardXp(userId, 18, 'career_application_kit', { world: WORLDS.career });
     res.json({ kit, savedId: row.id });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -868,7 +930,7 @@ router.post('/rooms/:roomId/submit', authMiddleware, async (req, res) => {
   let winner = st.winner;
   if (passed && !winner) {
     winner = userId;
-    await awardXpAndStreak(userId, 90);
+    await awardXp(userId, 90, 'career_duel_win', { world: WORLDS.career });
   }
 
   const nextStatus = {

@@ -10,6 +10,8 @@ import {
 import OnboardingQuiz from './OnboardingQuiz';
 import ProgressDashboard from './ProgressDashboard';
 import RoadmapVisualization from './RoadmapVisualization';
+import SkillScanTabs from './SkillScanTabs';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function downloadBase64File({ filename, contentBase64, mimeType }) {
   const bin = atob(contentBase64);
@@ -31,6 +33,8 @@ export default function RoadmapPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [activeTab, setActiveTab] = useState('planner');
+  const [editingQuiz, setEditingQuiz] = useState(false);
 
   const hasRoadmap = Boolean(roadmap?.phases?.length);
   const phases = useMemo(() => roadmap?.phases || [], [roadmap]);
@@ -62,6 +66,7 @@ export default function RoadmapPage() {
       setRoadmap(res.roadmap);
       const todayRes = await getRoadmapToday(user.id).catch(() => null);
       if (todayRes?.today) setToday(todayRes.today);
+      setEditingQuiz(false);
     } catch (e) {
       setError(e?.message || 'Roadmap generation failed.');
     } finally {
@@ -94,12 +99,20 @@ export default function RoadmapPage() {
           <div className="career-kicker">Career Roadmap</div>
           <h1 className="font-display font-extrabold text-3xl mt-1">AI-powered planning</h1>
           <p className="text-sm text-white/65 mt-2 max-w-2xl">
-            Personalized phases, project milestones, progress tracking, and daily next-action recommendations.
+            Personalized phases, progress tracking, and a SkillScan suite (ATS, gap analysis, job match, salary, LinkedIn, apps, certs, chat).
           </p>
         </div>
         {hasRoadmap ? (
           <div className="flex gap-2">
-            <button className="career-btn" onClick={() => handleGenerate(roadmap.quiz || {})}>Regenerate</button>
+            <button
+              className="career-btn"
+              onClick={() => {
+                setActiveTab('planner');
+                setEditingQuiz(true);
+              }}
+            >
+              Regenerate
+            </button>
             <button className="career-btn" onClick={onExport}>Export PDF</button>
             <button
               className="career-btn"
@@ -114,20 +127,64 @@ export default function RoadmapPage() {
         ) : null}
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="career-btn"
+          onClick={() => setActiveTab('planner')}
+          disabled={activeTab === 'planner'}
+        >
+          Planner
+        </button>
+        <button
+          className="career-btn"
+          onClick={() => setActiveTab('skillscan')}
+          disabled={activeTab === 'skillscan'}
+        >
+          SkillScan
+        </button>
+      </div>
+
       {error ? <div className="career-card text-red-300 border-red-500/40">{error}</div> : null}
 
-      {!hasRoadmap ? (
-        <OnboardingQuiz initial={roadmap?.quiz} loading={loading} onSubmit={handleGenerate} />
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2">
-            <RoadmapVisualization phases={phases} expandedId={expandedId} setExpandedId={setExpandedId} onToggleItem={onToggleItem} />
-          </div>
-          <div>
-            <ProgressDashboard roadmap={roadmap} today={today} />
-          </div>
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        {activeTab === 'planner' ? (
+          <motion.div
+            key="planner"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
+            exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+          >
+            {!hasRoadmap || editingQuiz ? (
+              <OnboardingQuiz
+                initial={roadmap?.quiz}
+                loading={loading}
+                onSubmit={handleGenerate}
+                onCancel={hasRoadmap ? () => setEditingQuiz(false) : undefined}
+              />
+            ) : (
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2">
+                  <RoadmapVisualization phases={phases} expandedId={expandedId} setExpandedId={setExpandedId} onToggleItem={onToggleItem} />
+                </div>
+                <div>
+                  <ProgressDashboard roadmap={roadmap} today={today} />
+                </div>
+              </div>
+            )}
+          </motion.div>
+        ) : null}
+
+        {activeTab === 'skillscan' ? (
+          <motion.div
+            key="skillscan"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
+            exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+          >
+            <SkillScanTabs />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

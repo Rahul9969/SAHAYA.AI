@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Network, Sparkles, Trophy, Wand2, FileBadge, BriefcaseBusiness, Route } from 'lucide-react';
+import { LayoutDashboard, Sparkles, Trophy, Wand2, FileBadge, Route, MessageSquare } from 'lucide-react';
 import WorldToggle from '../world/WorldToggle';
 import '../../styles/career.css';
 
@@ -8,9 +8,8 @@ const nav = [
   { to: '/career/visualizer', icon: Sparkles, label: 'Algorithm Visualizer' },
   { to: '/career/arena', icon: Trophy, label: 'DSA Arena + Duels' },
   { to: '/career/interview', icon: Wand2, label: 'Interview Lab' },
+  { to: '/career/socratic', icon: MessageSquare, label: 'Socratic Chat' },
   { to: '/career/roadmap', icon: Route, label: 'Career Roadmap' },
-  { to: '/career/job-hunter', icon: BriefcaseBusiness, label: 'Job Hunter' },
-  { to: '/career/map', icon: Network, label: 'Career Concept Map' },
   { to: '/career/resume', icon: FileBadge, label: 'Resume Hub' },
 ];
 

@@ -32,6 +32,7 @@ const GD_VOICE_PROFILES = [
   { pitch: 0.9, rate: 0.85 },
   { pitch: 1.3, rate: 1.1 },
 ];
+const MIC_WAVE_HEIGHTS = [6, 10, 8, 12, 7, 11, 9, 13];
 const DOMAINS = [
   { id: 'Operating Systems', icon: Monitor, short: 'OS' },
   { id: 'DBMS', icon: Database, short: 'DBMS' },
@@ -1349,9 +1350,16 @@ function GDRoom({ gdTopic, gdParticipants, gdTranscript, gdActiveSpeaker,
               )}
               {isRecording && (
                 <div className="flex items-end gap-0.5 mt-1 h-3">
-                  {[0,1,2,3,4,5,6,7].map(i => (
-                    <div key={i} className="w-1 bg-green-400 rounded-full" 
-                      style={{ height: `${4 + Math.random() * 8}px`, animation: 'il-wave 0.5s ease-in-out infinite alternate', animationDelay: `${i * 0.06}s` }} />
+                  {MIC_WAVE_HEIGHTS.map((h, i) => (
+                    <div
+                      key={i}
+                      className="w-1 bg-green-400 rounded-full"
+                      style={{
+                        height: `${h}px`,
+                        animation: 'il-wave 0.5s ease-in-out infinite alternate',
+                        animationDelay: `${i * 0.06}s`,
+                      }}
+                    />
                   ))}
                 </div>
               )}

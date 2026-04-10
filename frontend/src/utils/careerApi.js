@@ -5,6 +5,16 @@ export async function getCareerDashboard() {
   return data;
 }
 
+export async function getCareerAnalyticsSummary() {
+  const { data } = await api.get('/career/analytics/summary');
+  return data;
+}
+
+export async function getGamificationQuests(world = 'career') {
+  const { data } = await api.get('/gamification/quests', { params: { world } });
+  return data;
+}
+
 export async function listCareerProblems(params = {}) {
   const { data } = await api.get('/career/problems', { params });
   return data;
@@ -27,21 +37,6 @@ export async function submitCareerAttempt(payload) {
 
 export async function runCareerAttempt(payload) {
   const { data } = await api.post('/career/attempts/run', payload);
-  return data;
-}
-
-export async function getCareerConceptMap() {
-  const { data } = await api.get('/career/concept-map');
-  return data;
-}
-
-export async function setCareerTopicState(payload) {
-  const { data } = await api.post('/career/concept-map/state', payload);
-  return data;
-}
-
-export async function fetchConceptLesson(payload) {
-  const { data } = await api.post('/career/concept-map/lesson', payload);
   return data;
 }
 
@@ -90,60 +85,6 @@ export async function buildApplicationKit(payload) {
   return data;
 }
 
-export async function jobHunterApply(payload) {
-  const { data } = await api.post('/job-hunter/apply', payload);
-  return data;
-}
-
-export async function jobHunterApplications() {
-  const { data } = await api.get('/job-hunter/applications');
-  return data;
-}
-
-export async function jobHunterOutreach(payload) {
-  const { data } = await api.post('/job-hunter/outreach', payload);
-  return data;
-}
-
-export async function jobHunterOutreachList() {
-  const { data } = await api.get('/job-hunter/outreach');
-  return data;
-}
-
-export async function updateJobHunterOutreachStatus(outreachId, status) {
-  const { data } = await api.put(`/job-hunter/outreach/${encodeURIComponent(outreachId)}/status`, { status });
-  return data;
-}
-
-export async function streamJobHunterRun(applicationId, { onData, signal } = {}) {
-  const token = localStorage.getItem('stai_token');
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5006/api';
-  const res = await fetch(`${baseUrl}/job-hunter/applications/${encodeURIComponent(applicationId)}/stream`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    signal,
-  });
-  if (!res.ok || !res.body) throw new Error(`Stream failed (${res.status})`);
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder('utf-8');
-  let buffer = '';
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split('\n\n');
-    buffer = chunks.pop() || '';
-    for (const chunk of chunks) {
-      const line = chunk.split('\n').find((x) => x.startsWith('data: '));
-      if (!line) continue;
-      try {
-        onData?.(JSON.parse(line.slice(6)));
-      } catch {
-        // ignore malformed chunks
-      }
-    }
-  }
-}
-
 export async function generateRoadmap(payload) {
   const { data } = await api.post('/roadmap/generate', payload);
   return data;
@@ -171,5 +112,103 @@ export async function getRoadmapToday(userId) {
 
 export async function exportRoadmapPdf() {
   const { data } = await api.post('/roadmap/export/pdf', {});
+  return data;
+}
+
+// ----------------------------
+// SkillScan (Career Roadmap tabs)
+// ----------------------------
+export async function skillscanParseResume(payload) {
+  const { data } = await api.post('/career/skillscan/resume/parse', payload);
+  return data;
+}
+
+export async function skillscanAtsScore(payload) {
+  const { data } = await api.post('/career/skillscan/resume/ats-score', payload);
+  return data;
+}
+
+export async function skillscanAnalyzeSkills(payload) {
+  const { data } = await api.post('/career/skillscan/skills/analyze', payload);
+  return data;
+}
+
+export async function skillscanJobMatch(payload) {
+  const { data } = await api.post('/career/skillscan/job-match', payload);
+  return data;
+}
+
+export async function skillscanLinkedInAnalyze(payload) {
+  const { data } = await api.post('/career/skillscan/linkedin/analyze', payload);
+  return data;
+}
+
+export async function skillscanSalaryIntel(payload) {
+  const { data } = await api.post('/career/skillscan/salary/intel', payload);
+  return data;
+}
+
+export async function skillscanNegotiationScript(payload) {
+  const { data } = await api.post('/career/skillscan/salary/negotiation-script', payload);
+  return data;
+}
+
+export async function skillscanListApplications() {
+  const { data } = await api.get('/career/skillscan/applications');
+  return data;
+}
+
+export async function skillscanAddApplication(payload) {
+  const { data } = await api.post('/career/skillscan/applications', payload);
+  return data;
+}
+
+export async function skillscanPatchApplication(appId, payload) {
+  const { data } = await api.patch(`/career/skillscan/applications/${encodeURIComponent(appId)}`, payload);
+  return data;
+}
+
+export async function skillscanDeleteApplication(appId) {
+  const { data } = await api.delete(`/career/skillscan/applications/${encodeURIComponent(appId)}`);
+  return data;
+}
+
+export async function skillscanRejectionAnalysis() {
+  const { data } = await api.post('/career/skillscan/applications/rejection-analysis', {});
+  return data;
+}
+
+export async function skillscanRecommendCerts(payload) {
+  const { data } = await api.post('/career/skillscan/certifications/recommend', payload);
+  return data;
+}
+
+export async function skillscanListTrackedCerts() {
+  const { data } = await api.get('/career/skillscan/certifications/tracker');
+  return data;
+}
+
+export async function skillscanAddTrackedCert(payload) {
+  const { data } = await api.post('/career/skillscan/certifications/tracker', payload);
+  return data;
+}
+
+export async function skillscanPatchTrackedCert(id, payload) {
+  const { data } = await api.patch(`/career/skillscan/certifications/tracker/${encodeURIComponent(id)}`, payload);
+  return data;
+}
+
+export async function skillscanChat(payload) {
+  const { data } = await api.post('/career/skillscan/chat', payload);
+  return data;
+}
+
+export async function startCareerSocraticSession(payload) {
+  const { data } = await api.post('/career/socratic/start', payload);
+  return data;
+}
+
+export async function sendCareerSocraticTurn(payload) {
+  const { data } = await api.post('/career/socratic/turn', payload);
   return data;
 }
