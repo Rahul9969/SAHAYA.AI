@@ -32,10 +32,9 @@ import CareerDashboard from './pages/career/CareerDashboard';
 import AlgorithmVisualizer from './pages/career/AlgorithmVisualizer';
 import ProblemArena from './pages/career/ProblemArena';
 import InterviewLab from './pages/career/InterviewLab';
-import ConceptMap from './pages/career/ConceptMap';
 import ResumeHub from './pages/career/ResumeHub';
-import CareerJobHunterPage from './features/job-hunter/CareerJobHunterPage';
 import RoadmapPage from './features/career-roadmap/RoadmapPage';
+import SocraticChat from './pages/career/SocraticChat';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -115,9 +114,8 @@ export default function App() {
                 <Route path="visualizer" element={<AlgorithmVisualizer />} />
                 <Route path="arena" element={<ProblemArena />} />
                 <Route path="interview" element={<InterviewLab />} />
-                <Route path="job-hunter" element={<CareerJobHunterPage />} />
+                <Route path="socratic" element={<SocraticChat />} />
                 <Route path="roadmap" element={<RoadmapPage />} />
-                <Route path="map" element={<ConceptMap />} />
                 <Route path="resume" element={<ResumeHub />} />
                 <Route path="*" element={<Navigate to="/career/dashboard" replace />} />
               </Route>

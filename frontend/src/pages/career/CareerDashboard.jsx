@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Flame, Gauge, Trophy, Zap } from 'lucide-react';
 import { ErrorState, LoadingSkeleton, EmptyState } from '../../components/PageStates';
-import { getCareerDashboard } from '../../utils/careerApi';
+import { getCareerDashboard, getCareerAnalyticsSummary, getGamificationQuests } from '../../utils/careerApi';
 import { NavLink } from 'react-router-dom';
 
 function Stat({ icon: Icon, label, value, hint }) {
@@ -21,12 +21,20 @@ function Stat({ icon: Icon, label, value, hint }) {
 
 export default function CareerDashboard() {
   const [state, setState] = useState({ loading: true, error: null, data: null });
+  const [quests, setQuests] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
 
   const load = async () => {
     setState({ loading: true, error: null, data: null });
     try {
-      const data = await getCareerDashboard();
+      const [data, q, a] = await Promise.all([
+        getCareerDashboard(),
+        getGamificationQuests('career'),
+        getCareerAnalyticsSummary().catch(() => null),
+      ]);
       setState({ loading: false, error: null, data });
+      setQuests(q?.quests || []);
+      setAnalytics(a);
     } catch (e) {
       setState({ loading: false, error: 'Failed to load Career dashboard.', data: null });
     }
@@ -133,6 +141,35 @@ export default function CareerDashboard() {
           </div>
         </div>
       </div>
+
+      <div className="career-card p-6">
+        <div className="text-[11px] font-extrabold uppercase tracking-[0.28em] text-white/55">Daily quests (Career)</div>
+        <div className="font-display font-extrabold text-xl mt-1">Shared gamification layer</div>
+        <div className="mt-4 space-y-2">
+          {quests.length ? quests.map((q) => (
+            <div key={q.id} className="border border-white/10 rounded-2xl p-4 bg-white/[0.03] flex items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold">{q.title}</div>
+                <div className="text-xs text-white/55 mt-1">{q.current}/{q.target} · +{q.xpReward} XP</div>
+              </div>
+              <div className="career-chip">{q.completed ? 'DONE' : 'ACTIVE'}</div>
+            </div>
+          )) : <div className="text-sm text-white/60">No quests available yet.</div>}
+        </div>
+      </div>
+
+      {analytics ? (
+        <div className="career-card p-6">
+          <div className="text-[11px] font-extrabold uppercase tracking-[0.28em] text-white/55">Usage analytics</div>
+          <div className="font-display font-extrabold text-xl mt-1">Career activity summary</div>
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div><div className="font-display font-extrabold text-2xl">{analytics.usage?.attempts ?? 0}</div><div className="text-xs text-white/55">Submissions</div></div>
+            <div><div className="font-display font-extrabold text-2xl">{analytics.usage?.interviewSessions ?? 0}</div><div className="text-xs text-white/55">Interviews</div></div>
+            <div><div className="font-display font-extrabold text-2xl">{analytics.usage?.visualizerRuns ?? 0}</div><div className="text-xs text-white/55">Visualizer runs</div></div>
+            <div><div className="font-display font-extrabold text-2xl">{analytics.learning?.passRate ?? 0}%</div><div className="text-xs text-white/55">Pass rate</div></div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

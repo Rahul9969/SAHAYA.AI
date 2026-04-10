@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Search, Send, Sparkles } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { askStudyQuestion } from '../utils/ai';
 import api from '../utils/api';
 import { useSession } from '../hooks/useSession';
+import { getCareerAnalyticsSummary } from '../utils/careerApi';
 
 const NOTEBOOK_COLORS = [
   { cover: '#FFB6C1', spine: '#f0849a' },
@@ -42,6 +43,7 @@ export default function Dashboard() {
   const [aiLoading, setAiLoading] = useState(false);
   const [coachTip, setCoachTip] = useState('');
   const [coachLoading, setCoachLoading] = useState(false);
+  const [careerSummary, setCareerSummary] = useState(null);
   const subjects = eduData?.subjects || ['Mathematics', 'Physics', 'Chemistry'];
 
   const fetchCoach = async () => {
@@ -62,6 +64,21 @@ export default function Dashboard() {
     catch { setAiAnswer('⚠️ Could not get an answer. Ensure GEMINI_API_KEY is set on the server (.env).'); }
     setAiLoading(false);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getCareerAnalyticsSummary();
+        if (!cancelled) setCareerSummary(data);
+      } catch {
+        if (!cancelled) setCareerSummary(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -102,6 +119,25 @@ export default function Dashboard() {
               </button>
             </div>
             {coachTip ? <p className="text-sm text-[#0D0D0D] leading-relaxed">{coachTip}</p> : <p className="text-sm text-[#999999]">Get a contextual nudge based on your activity and recent quizzes.</p>}
+          </div>
+
+          {/* Career summary integrated into existing dashboard */}
+          <div className="bg-white border-2 border-[#E0E0E0] rounded-[16px] p-5 animate-fadeUp">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#555555]">
+                <Sparkles size={16} /> Career snapshot
+              </div>
+            </div>
+            {careerSummary ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div><strong>{careerSummary?.profile?.xp ?? 0}</strong><div className="text-[#666]">XP</div></div>
+                <div><strong>{careerSummary?.learning?.readinessScore ?? 0}%</strong><div className="text-[#666]">Readiness</div></div>
+                <div><strong>{careerSummary?.usage?.attempts ?? 0}</strong><div className="text-[#666]">Attempts</div></div>
+                <div><strong>{careerSummary?.usage?.interviewSessions ?? 0}</strong><div className="text-[#666]">Interviews</div></div>
+              </div>
+            ) : (
+              <p className="text-sm text-[#999999]">No Career analytics yet. Start in Career World to populate metrics.</p>
+            )}
           </div>
 
           {/* Global search */}

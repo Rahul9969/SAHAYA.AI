@@ -93,6 +93,27 @@
   cursor: not-allowed;
 }
 
+[data-world="career"] .career-input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--career-text);
+  padding: 12px 14px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+[data-world="career"] .career-input::placeholder {
+  color: rgba(148, 163, 184, 0.7);
+}
+
+[data-world="career"] .career-input:focus {
+  border-color: rgba(6, 182, 212, 0.42);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.12);
+}
+
 [data-world="career"] .career-chip {
   display: inline-flex;
   align-items: center;

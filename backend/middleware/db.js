@@ -7,6 +7,7 @@ import { computeRowId } from '../services/rowId.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const TABLE = 'app_data_rows';
+const warnedCollections = new Set();
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -33,7 +34,10 @@ function writeFileDB(name, data) {
 
 async function readSupabase(collection) {
   const supabase = getSupabase();
-  const { data, error } = await supabase.from(TABLE).select('payload').eq('collection', collection);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('payload')
+    .eq('collection', collection);
   if (error) throw new Error(`Supabase read ${collection}: ${error.message}`);
   return (data || []).map((r) => r.payload);
 }
@@ -79,13 +83,38 @@ async function upsertOneSupabase(collection, doc) {
   if (error) throw new Error(`Supabase upsertOne ${collection}: ${error.message}`);
 }
 
+function warnFallback(collection, operation, err) {
+  const key = `${collection}:${operation}`;
+  if (warnedCollections.has(key)) return;
+  warnedCollections.add(key);
+  console.warn(`[db] Supabase ${operation} failed for ${collection}. Falling back to local JSON.`, err?.message || err);
+}
+
+async function withFallbackRead(collection, operation, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    warnFallback(collection, operation, err);
+    return readFileDB(collection);
+  }
+}
+
+async function withFallbackWrite(collection, operation, fn, fallbackData) {
+  try {
+    await fn();
+  } catch (err) {
+    warnFallback(collection, operation, err);
+    if (Array.isArray(fallbackData)) writeFileDB(collection, fallbackData);
+  }
+}
+
 /**
  * Read all documents in a collection (same shape as legacy JSON array).
  * @param {string} name
  * @returns {Promise<any[]>}
  */
 export async function readDB(name) {
-  if (isSupabaseEnabled()) return readSupabase(name);
+  if (isSupabaseEnabled()) return withFallbackRead(name, 'read', () => readSupabase(name));
   return readFileDB(name);
 }
 
@@ -95,7 +124,7 @@ export async function readDB(name) {
  * @param {any[]} data
  */
 export async function writeDB(name, data) {
-  if (isSupabaseEnabled()) return writeSupabase(name, data);
+  if (isSupabaseEnabled()) return withFallbackWrite(name, 'write', () => writeSupabase(name, data), data);
   writeFileDB(name, data);
 }
 
@@ -111,7 +140,10 @@ export async function findAll(collection, predicate) {
 
 export async function insertOne(collection, doc) {
   if (isSupabaseEnabled()) {
-    await upsertOneSupabase(collection, doc);
+    await withFallbackWrite(collection, 'insertOne', () => upsertOneSupabase(collection, doc), [
+      ...readFileDB(collection),
+      doc,
+    ]);
     return doc;
   }
   const data = readFileDB(collection);
@@ -122,11 +154,11 @@ export async function insertOne(collection, doc) {
 
 export async function updateOne(collection, predicate, updates) {
   if (isSupabaseEnabled()) {
-    const data = await readSupabase(collection);
+    const data = await withFallbackRead(collection, 'updateOne.read', () => readSupabase(collection));
     const idx = data.findIndex(predicate);
     if (idx === -1) return null;
     data[idx] = { ...data[idx], ...updates };
-    await writeSupabase(collection, data);
+    await withFallbackWrite(collection, 'updateOne.write', () => writeSupabase(collection, data), data);
     return data[idx];
   }
   const data = readFileDB(collection);
@@ -139,11 +171,11 @@ export async function updateOne(collection, predicate, updates) {
 
 export async function upsertOne(collection, predicate, doc) {
   if (isSupabaseEnabled()) {
-    const data = await readSupabase(collection);
+    const data = await withFallbackRead(collection, 'upsertOne.read', () => readSupabase(collection));
     const idx = data.findIndex(predicate);
     if (idx === -1) data.push(doc);
     else data[idx] = { ...data[idx], ...doc };
-    await writeSupabase(collection, data);
+    await withFallbackWrite(collection, 'upsertOne.write', () => writeSupabase(collection, data), data);
     return idx === -1 ? doc : data[data.findIndex(predicate)];
   }
   const data = readFileDB(collection);
@@ -159,11 +191,11 @@ export async function upsertOne(collection, predicate, doc) {
 
 export async function deleteOne(collection, predicate) {
   if (isSupabaseEnabled()) {
-    const data = await readSupabase(collection);
+    const data = await withFallbackRead(collection, 'deleteOne.read', () => readSupabase(collection));
     const idx = data.findIndex(predicate);
     if (idx === -1) return false;
     data.splice(idx, 1);
-    await writeSupabase(collection, data);
+    await withFallbackWrite(collection, 'deleteOne.write', () => writeSupabase(collection, data), data);
     return true;
   }
   const data = readFileDB(collection);

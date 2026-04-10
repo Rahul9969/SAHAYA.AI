@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const ROLE_OPTIONS = ['Frontend Engineer', 'Backend Engineer', 'Full Stack Engineer', 'AI/ML Engineer', 'Data Scientist', 'Product Manager', 'DevOps Engineer', 'UX Designer'];
 const SKILL_OPTIONS = ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'SQL', 'Git', 'Communication', 'Docker', 'System Design'];
 
-export default function OnboardingQuiz({ initial, onSubmit, loading }) {
+export default function OnboardingQuiz({ initial, onSubmit, loading, onCancel }) {
   const [form, setForm] = useState(() => ({
     educationLevel: initial?.educationLevel || 'undergraduate',
     skills: initial?.skills || [],
@@ -12,6 +12,16 @@ export default function OnboardingQuiz({ initial, onSubmit, loading }) {
     learningStyle: initial?.learningStyle || 'project-based',
   }));
   const canSubmit = useMemo(() => form.targetRole && form.timeline, [form]);
+
+  useEffect(() => {
+    setForm({
+      educationLevel: initial?.educationLevel || 'undergraduate',
+      skills: initial?.skills || [],
+      targetRole: initial?.targetRole || 'Frontend Engineer',
+      timeline: initial?.timeline || '1 year',
+      learningStyle: initial?.learningStyle || 'project-based',
+    });
+  }, [initial?.educationLevel, initial?.learningStyle, initial?.targetRole, initial?.timeline, initial?.skills]);
 
   const toggleSkill = (skill) => {
     setForm((prev) => ({
@@ -78,7 +88,14 @@ export default function OnboardingQuiz({ initial, onSubmit, loading }) {
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-3">
+        {onCancel ? (
+          <button type="button" className="career-btn opacity-80 hover:opacity-100" onClick={onCancel} disabled={loading}>
+            Cancel
+          </button>
+        ) : (
+          <div />
+        )}
         <button type="button" disabled={!canSubmit || loading} className="career-btn" onClick={() => onSubmit(form)}>
           {loading ? 'Generating...' : 'Generate roadmap'}
         </button>

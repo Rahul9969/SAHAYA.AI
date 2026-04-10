@@ -28,9 +28,11 @@ import studyGoalsRoutes from './routes/studyGoals.js';
 import studyArenaRoutes from './routes/studyArena.js';
 import studyGamificationRoutes from './routes/studyGamification.js';
 import careerRoutes from './routes/career.js';
-import jobHunterRoutes from './job-hunter/routes.js';
+import skillscanRoutes from './routes/skillscan.js';
 import careerRoadmapRoutes from './career-roadmap/routes.js';
 import interviewLabRoutes from './routes/interviewLab.js';
+import gamificationRoutes from './routes/gamification.js';
+import socraticRoutes from './routes/socratic.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -61,8 +63,10 @@ app.use('/api/study/exam', studyExamRoutes);
 app.use('/api/study/goals', studyGoalsRoutes);
 app.use('/api/study/arena', studyArenaRoutes);
 app.use('/api/study', studyGamificationRoutes);
+app.use('/api/gamification', gamificationRoutes);
 app.use('/api/career', careerRoutes);
-app.use('/api/job-hunter', jobHunterRoutes);
+app.use('/api/career/skillscan', skillscanRoutes);
+app.use('/api/career/socratic', socraticRoutes);
 app.use('/api/roadmap', careerRoadmapRoutes);
 app.use('/api/interview', interviewLabRoutes);
 
