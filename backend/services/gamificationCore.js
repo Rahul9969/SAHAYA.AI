@@ -228,11 +228,15 @@ export async function getOrCreateDailyQuests(userId, world) {
     .gt('expires_at', nowIso());
 
   if (existing && existing.length >= 3) {
-    // DEV HACK: Auto-complete first quest so the user can test the animation!
-    if (existing[0] && existing[0].status === 'pending') {
-       existing[0].status = 'completed';
-       existing[0].progress = existing[0].target;
-       await supabase.from('daily_quests').update({ status: 'completed', progress: existing[0].target }).eq('id', existing[0].id);
+    // If ALL quests are already claimed, reset them all back to 'completed'
+    // so the user can re-claim and test the reward animation again
+    const allClaimed = existing.every(q => q.status === 'claimed');
+    if (allClaimed) {
+      const ids = existing.map(q => q.id);
+      await supabase.from('daily_quests')
+        .update({ status: 'completed' })
+        .in('id', ids);
+      return existing.map(q => ({ ...q, status: 'completed' }));
     }
     return existing;
   }
