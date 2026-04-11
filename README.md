@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="./docs/images/banner.png" alt="SAHAYA.AI Banner" width="100%" />
   
   # SAHAYA.AI — Intelligent Learning & Career System
   
