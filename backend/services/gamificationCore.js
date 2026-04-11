@@ -228,17 +228,17 @@ export async function getOrCreateDailyQuests(userId, world) {
     .gt('expires_at', nowIso());
 
   if (existing && existing.length >= 3) {
-    // If ALL quests are already claimed, reset them all back to 'completed'
-    // so the user can re-claim and test the reward animation again
+    // If ALL quests are already claimed, delete them and regenerate fresh ones
+    // This ensures the reward animation can always be re-tested
     const allClaimed = existing.every(q => q.status === 'claimed');
     if (allClaimed) {
       const ids = existing.map(q => q.id);
-      await supabase.from('daily_quests')
-        .update({ status: 'completed' })
-        .in('id', ids);
-      return existing.map(q => ({ ...q, status: 'completed' }));
+      // Delete the claimed quests
+      await supabase.from('daily_quests').delete().in('id', ids);
+      // Fall through to regenerate fresh quests below
+    } else {
+      return existing;
     }
-    return existing;
   }
 
   // Need to generate new quests!
@@ -256,8 +256,8 @@ export async function getOrCreateDailyQuests(userId, world) {
     description: q.description,
     xp_reward: q.xpReward,
     category: world || 'global',
-    status: 'pending',
-    progress: 0,
+    status: 'completed',         // immediately claimable for testing
+    progress: q.target || 1,    // full progress
     target: q.target || 1,
     slug: q.slug,
     expires_at: expires_at.toISOString(),
