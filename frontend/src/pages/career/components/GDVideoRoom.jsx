@@ -21,7 +21,7 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
   const intervalRef = useRef(null);
   const hasJoinedRef = useRef(false); // Guard: only true after successful room join
   
-  const { transcript, startListening, stopListening } = useSpeechTracker();
+  const { transcript, interimTranscript, startListening, stopListening } = useSpeechTracker();
   const { metrics, startMonitoring, stopMonitoring } = useFaceMonitor(localVideoRef);
 
   // Sync session end across all participants
@@ -269,12 +269,12 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
         <div ref={containerRef} className="w-full h-full absolute inset-0"></div>
         
         {/* Live Speech Captions Overlay */}
-        {transcript && transcript.length > 0 && (
+        {(interimTranscript || (transcript && transcript.length > 0)) && (
           <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 pointer-events-none z-[99]">
             <div className="bg-black bg-opacity-60 backdrop-blur-md border border-white/10 rounded-xl p-3 text-center shadow-2xl transition-opacity duration-300">
               <p className="text-white text-base md:text-lg font-medium tracking-wide drop-shadow-md">
                 <span className="text-[var(--career-accent)] mr-2 font-bold opacity-80">You:</span>
-                {transcript[transcript.length - 1].text}
+                {interimTranscript || transcript[transcript.length - 1]?.text}
               </p>
             </div>
           </div>

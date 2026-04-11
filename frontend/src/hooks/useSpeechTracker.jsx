@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 
 export const useSpeechTracker = () => {
   const [transcript, setTranscript] = useState([]);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -17,17 +18,29 @@ export const useSpeechTracker = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
-      const current = event.resultIndex;
-      const result = event.results[current][0].transcript;
+      let finalStr = '';
+      let interimStr = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalStr += text + ' ';
+        } else {
+          interimStr += text;
+        }
+      }
       
-      setTranscript(prev => [...prev, {
-        text: result,
-        timestamp: new Date().toISOString()
-      }]);
+      if (finalStr.trim()) {
+        setTranscript(prev => [...prev, {
+          text: finalStr.trim(),
+          timestamp: new Date().toISOString()
+        }]);
+      }
+      setInterimTranscript(interimStr);
     };
 
     recognition.onstart = () => {
@@ -89,6 +102,7 @@ export const useSpeechTracker = () => {
 
   return {
     transcript,
+    interimTranscript,
     isListening,
     startListening,
     stopListening,

@@ -721,17 +721,47 @@ Based on this data, generate a highly detailed JSON report.
 Penalize if the speaking time is too low (silent participant) or too high (dominating).
 Validate the quality of the points in the transcript.
 
-Output ONLY valid JSON without markdown wrapping:
+Output ONLY valid JSON without markdown wrapping matching this exact schema:
 {
-  "overallScore": 85,
-  "metrics": {
-    "communicationSkills": "Analysis of their speaking time and point delivery.",
-    "bodyLanguage": "Analysis of their facial expressions and confidence.",
-    "relevance": "How relevant their spoken points were to the main topic."
+  "overallScore": <0-100>,
+  "grade": "<A+|A|B+|B|C+|C|D|F>",
+  "verdict": "<Strong Performance|Good Performance|Needs Improvement|Needs Significant Improvement|Poor Performance>",
+  "hiringRecommendation": "<Ready for Placement|Almost Ready — Needs Polish|Not Ready for Placement>",
+  "categoryScores": {
+    "communication": <0-100>,
+    "confidence": <0-100>,
+    "relevance": <0-100>,
+    "teamwork": <0-100>,
+    "initiative": <0-100>
   },
-  "strengths": ["...", "...", "..."],
-  "weaknesses": ["...", "...", "..."],
-  "actionableAdvice": ["...", "..."]
+  "strengths": ["...", "..."],
+  "weaknesses": ["...", "..."],
+  "questionsReview": [
+    {
+      "question": "Contribution Analysis",
+      "yourAnswer": "Summary of what they spoke about",
+      "correctAnswer": "What the ideal contribution would have been",
+      "score": <1-10>,
+      "whatYouMissed": "Any gaps in logic",
+      "howToImprove": "How to argue this point better next time"
+    }
+  ],
+  "facialAnalysisSummary": {
+    "averageConfidence": <0-100>,
+    "eyeContactRating": "<Good|Average|Poor|N/A>",
+    "stressPattern": "<description>",
+    "bodyLanguageTips": ["...", "..."]
+  },
+  "voiceAnalysisSummary": {
+    "averagePace": "<Slow|Normal|Fast|N/A>",
+    "volumeConsistency": "<Good|Average|Poor|N/A>",
+    "pitchStability": "<Stable|Unstable|N/A>",
+    "voiceTips": ["...", "..."]
+  },
+  "improvementPlan": [
+    { "week": 1, "focus": "...", "action": "..." }
+  ],
+  "nextInterviewType": "Group Discussion Mock 2"
 }`;
 
     const userPrompt = 'Analyze this live GD data and generate the JSON report.';
@@ -742,14 +772,24 @@ Output ONLY valid JSON without markdown wrapping:
       console.error('[interview/analyze-gd] Gemini error:', err.message);
       report = {
         overallScore: 70,
-        metrics: {
-          communicationSkills: "Could not analyze due to AI timeout.",
-          bodyLanguage: "Based on data, maintaining eye contact is recommended.",
-          relevance: "Ensure points are tightly related to the topic."
-        },
-        strengths: ["Completed the GD"],
-        weaknesses: ["AI analysis failed"],
-        actionableAdvice: ["Try again when network is stable."]
+        grade: "B",
+        verdict: "Needs Improvement",
+        hiringRecommendation: "Almost Ready — Needs Polish",
+        categoryScores: { communication: 70, confidence: 60, relevance: 75, teamwork: 80, initiative: 50 },
+        strengths: ["Participated in the Group Discussion", "Maintained presence across the session"],
+        weaknesses: ["AI Analysis unavailable due to network timeout or missing transcript"],
+        questionsReview: [{
+          question: "Overall Contribution",
+          yourAnswer: "No transcript data could be processed.",
+          correctAnswer: "Ensure your microphone is firmly connected and wait for AI.",
+          score: 5,
+          whatYouMissed: "Data timeout.",
+          howToImprove: "Try standard Solo Interviews if network issues persist."
+        }],
+        facialAnalysisSummary: { averageConfidence: 60, eyeContactRating: 'Average', stressPattern: 'Incomplete data', bodyLanguageTips: ['Look directly at the camera while speaking.'] },
+        voiceAnalysisSummary: { averagePace: 'N/A', volumeConsistency: 'N/A', pitchStability: 'N/A', voiceTips: ['Speak clearly into the microphone.'] },
+        improvementPlan: [{ week: 1, focus: 'Networking', action: 'Ensure stable internet connection for AI analysis.' }],
+        nextInterviewType: 'Technical'
       };
     }
 
