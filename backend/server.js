@@ -41,8 +41,20 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5005',
+  'http://192.168.7.156:5005'
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5005',
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -185,8 +197,8 @@ io.on('connection', (socket) => {
   });
 });
 
-const server = httpServer.listen(PORT, () => {
-  console.log(`\n🚀 Intelligent Learning AI System (Study) Backend → http://localhost:${PORT}`);
+const server = httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🚀 Intelligent Learning AI System (Study) Backend → http://0.0.0.0:${PORT}`);
   console.log(`📁 Data stored in: ./data/`);
   console.log(`⚡ Groq: ${process.env.GROQ_API_KEY ? '✅ Set' : '❌ Missing (optional)'}`);
   console.log(`🔑 Gemini: ${process.env.GEMINI_API_KEY ? '✅ Set' : '❌ Missing (optional)'}`);

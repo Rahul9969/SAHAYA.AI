@@ -45,12 +45,19 @@ export const useSpeechTracker = () => {
       
       // Auto-restart if we want continuous listening
       if (recognitionRef.current && !isIntentionalStopRef.current) {
-         try { recognition.start(); } catch(e){}
+         // Add a small delay to prevent tight network error loops
+         setTimeout(() => {
+           try { recognitionRef.current?.start(); } catch(e){}
+         }, 1000);
       }
     };
 
     recognition.onerror = (event) => {
-      console.error('Speech recognition error', event.error);
+      if (event.error === 'network') {
+        console.warn('Speech recognition network error (likely hit API quota or flaky connection). Will retry briefly.');
+      } else {
+        console.warn('Speech recognition error:', event.error);
+      }
     };
 
     recognitionRef.current = recognition;

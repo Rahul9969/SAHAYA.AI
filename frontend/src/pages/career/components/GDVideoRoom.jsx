@@ -9,8 +9,14 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
   const localVideoRef = useRef(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [initError, setInitError] = useState(null);
+  
+  // Safe duration fallback
+  const safeDuration = (duration && duration > 0) ? duration : 10;
+  const [timeLeft, setTimeLeft] = useState(safeDuration * 60);
+  
   const zpRef = useRef(null);
   const timerRef = useRef(null);
+  const intervalRef = useRef(null);
   const hasJoinedRef = useRef(false); // Guard: only true after successful room join
   
   const { transcript, startListening, stopListening } = useSpeechTracker();
@@ -38,6 +44,7 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
           scenario: {
             mode: ZegoUIKitPrebuilt.GroupCall,
           },
+          layout: "Auto",
           showPreJoinView: false,
           turnOnMicrophoneWhenJoining: true,
           turnOnCameraWhenJoining: true,
@@ -51,10 +58,20 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
             hasJoinedRef.current = true; // Mark as successfully joined
             
             // Start the GD duration timer ONLY after successful join
-            const safeDuration = (duration && duration > 0) ? duration : 10;
             timerRef.current = setTimeout(() => {
               handleComplete();
             }, safeDuration * 60 * 1000);
+            
+            // Start the visual countdown
+            intervalRef.current = setInterval(() => {
+              setTimeLeft((prev) => {
+                if (prev <= 1) {
+                  clearInterval(intervalRef.current);
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
 
             navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
               if (localVideoRef.current) {
@@ -64,9 +81,9 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
               }
             }).catch(err => console.warn('Failed to obtain stream for AI', err));
           },
+          // Trigger completion remotely if someone else disconnected or left
           onLeaveRoom: () => {
-            // Only trigger completion if the room was actually joined
-            if (hasJoinedRef.current) {
+            if (hasJoinedRef.current && !isAnalyzing) {
               handleComplete();
             }
           }
@@ -84,7 +101,8 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
     return () => {
       cancelled = true;
       clearTimeout(timerRef.current);
-      try { if (zpRef.current) zpRef.current.destroy(); } catch (e) { console.warn("Zego destroy blocked", e); }
+      clearInterval(intervalRef.current);
+      try { if (zpRef.current) zpRef.current.destroy(); } catch (e) { console.warn("Zego destroy block caught quietly", e); }
       stopListening();
       stopMonitoring();
     };
@@ -92,37 +110,33 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
 
   const handleComplete = async () => {
     if (isAnalyzing) return;
-    if (!hasJoinedRef.current) return; // Never end if room was never joined
     setIsAnalyzing(true);
     stopListening();
     stopMonitoring();
     clearTimeout(timerRef.current);
+    clearInterval(intervalRef.current);
     
+    // Explicitly leave room gracefully before api call if we can
+    try { 
+      if (zpRef.current && typeof zpRef.current.leaveRoom === 'function') {
+         zpRef.current.leaveRoom();
+      }
+    } catch(e) {}
+
     try {
       const response = await api.post('/interview/analyze-gd', {
         transcript,
         faceMetrics: metrics,
-        duration,
+        duration: safeDuration,
         topic
       });
-      try { if (zpRef.current) zpRef.current.destroy(); } catch(e){}
+      // Component will unmount via parent state change, letting the useEffect cleanup handle actual destroy()
       onEnd(response.data.report);
     } catch (err) {
       console.error(err);
-      try { if (zpRef.current) zpRef.current.destroy(); } catch(e){}
       onEnd(null);
     }
   };
-
-  if (isAnalyzing) {
-    return (
-      <div className="flex flex-col items-center justify-center p-12 text-white h-[60vh]">
-        <h2 className="text-3xl font-bold mb-4">Generating AI Performance Report</h2>
-        <div className="animate-pulse h-12 w-12 bg-indigo-500 rounded-full mb-4"></div>
-        <p className="text-gray-400">Processing transcripts and evaluating your facial metrics...</p>
-      </div>
-    );
-  }
 
   if (initError) {
     return (
@@ -162,19 +176,13 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
     );
   }
 
-  if (!import.meta.env.VITE_ZEGO_APP_ID) {
+  if (!import.meta.env.VITE_ZEGO_APP_ID || import.meta.env.VITE_ZEGO_APP_ID.includes('your_real')) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-white h-[60vh] bg-white/[0.02] border border-red-500/20 rounded-2xl">
         <h2 className="text-3xl font-bold mb-4 text-red-400">Missing Video Provider Keys</h2>
         <p className="text-gray-400 max-w-lg text-center mb-6">
           You successfully matched with peers, but the live WebRTC room couldn't be launched because the <strong>ZegoCloud</strong> API keys are missing in your frontend <code>.env</code>.
         </p>
-        <div className="bg-gray-900 p-4 rounded-lg border border-gray-700 w-full max-w-lg mb-6">
-          <code className="text-sm font-mono text-green-400 block break-all">
-            VITE_ZEGO_APP_ID=your_id_here<br/>
-            VITE_ZEGO_SERVER_SECRET=your_secret_here
-          </code>
-        </div>
         <button 
           onClick={() => {
             hasJoinedRef.current = true;
@@ -188,24 +196,50 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
     );
   }
 
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="relative w-full h-[80vh] bg-gray-900 rounded-xl overflow-hidden flex flex-col border border-gray-700 shadow-2xl">
-      <div className="flex justify-between items-center bg-gray-800 p-4 border-b border-gray-700 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-          <h3 className="text-white font-semibold text-lg">Topic: {topic}</h3>
+    <div className="relative w-full h-[85vh] bg-gray-950 rounded-xl overflow-hidden flex flex-col border border-gray-800 shadow-2xl">
+      {/* Absolute Loading Overlay. We do this instead of returning a different node tree, so Zego Container isn't unmounted before destruction, preventing null node crashes */}
+      {isAnalyzing && (
+        <div className="absolute inset-0 z-50 bg-gray-900 bg-opacity-95 flex flex-col items-center justify-center p-12 text-white backdrop-blur-sm">
+          <h2 className="text-3xl font-bold mb-4">Generating AI Performance Report</h2>
+          <div className="animate-pulse h-12 w-12 bg-[var(--career-accent)] rounded-full mb-4"></div>
+          <p className="text-gray-400">Processing transcripts and evaluating your facial metrics...</p>
         </div>
-        <button 
-          onClick={handleComplete}
-          className="px-6 py-2 bg-gradient-to-r from-red-500 to-rose-600 text-white font-medium rounded-lg shadow-lg hover:shadow-red-500/20 transition-all z-10"
-        >
-          End Discussion
-        </button>
+      )}
+
+      <div className="flex justify-between items-center bg-gray-900 p-4 shrink-0 relative z-10 box-border">
+        <div className="flex items-center gap-4 bg-gray-800/80 px-4 py-2 rounded-lg border border-gray-700">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse hidden sm:block"></div>
+          <div className="flex flex-col">
+            <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Group Discussion Topic</span>
+            <h3 className="text-white font-bold text-lg sm:text-xl leading-tight">{topic}</h3>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4 shrink-0">
+          <div className={`px-4 py-2 rounded-lg font-mono font-bold text-lg border ${timeLeft < 60 ? 'bg-red-500/10 text-red-400 border-red-500/30 animate-pulse' : 'bg-gray-800 text-emerald-400 border-gray-700'}`}>
+            {formatTime(timeLeft)}
+          </div>
+          <button 
+            onClick={handleComplete}
+            disabled={isAnalyzing}
+            className="px-6 py-2 bg-gradient-to-r from-red-600 to-rose-700 text-white font-medium rounded-lg shadow-lg shadow-red-900/20 hover:opacity-90 disabled:opacity-50 transition-all active:scale-95"
+          >
+            End Discussion
+          </button>
+        </div>
       </div>
        
       <video ref={localVideoRef} autoPlay muted playsInline className="opacity-0 absolute pointer-events-none w-0 h-0" />
        
-      <div ref={containerRef} className="w-full h-full flex-grow bg-black"></div>
+      {/* We keep this mounted at all times securely */}
+      <div ref={containerRef} className="w-full h-full flex-grow bg-black relative z-0"></div>
     </div>
   );
 }
