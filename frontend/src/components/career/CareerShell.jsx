@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Sparkles, Trophy, Wand2, FileBadge, Route, User, LogOut, Edit, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Sparkles, Trophy, Wand2, FileBadge, Route, User, LogOut, Edit, ChevronDown, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import WorldToggle from '../world/WorldToggle';
 import '../../styles/career.css';
@@ -24,17 +24,40 @@ export default function CareerShell() {
     navigate('/');
   };
 
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
   return (
-    <div data-world="career" className="flex min-h-screen">
-      <aside className="w-80 max-md:hidden flex-shrink-0 h-screen sticky top-0 flex flex-col px-5 py-6 border-r border-[rgba(139,92,246,0.2)]">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="min-w-0">
-            <div className="career-kicker">Career</div>
-            <div className="font-display font-extrabold text-[22px] truncate text-[var(--career-text)]">
-              Technical Prep Suite
+    <>
+      {/* Mobile Hamburger Button */}
+      <button
+        onClick={() => setIsMobileOpen(!isMobileOpen)}
+        className="md:hidden fixed z-[90] top-[14px] left-4 p-1.5 bg-[#111118] border border-[rgba(139,92,246,0.5)] text-[#06B6D4] rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
+      >
+        {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      {/* Mobile Backdrop */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-[80] md:hidden backdrop-blur-sm"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      <div data-world="career" className="flex min-h-screen">
+        <aside 
+          className={`w-80 flex-shrink-0 h-screen fixed md:sticky top-0 left-0 flex flex-col px-5 py-6 border-r border-[rgba(139,92,246,0.2)] bg-[#0A0A0F] z-[85] transition-transform duration-300 ease-in-out ${
+            isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-6 mt-8 md:mt-0">
+            <div className="min-w-0">
+              <div className="career-kicker">Career</div>
+              <div className="font-display font-extrabold text-[22px] truncate text-[var(--career-text)]">
+                Technical Prep Suite
+              </div>
             </div>
           </div>
-        </div>
 
         <nav className="flex flex-col gap-1.5" style={{ rowGap: '6px' }}>
           {nav.map(({ to, icon: Icon, label }) => (
@@ -63,15 +86,15 @@ export default function CareerShell() {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 bg-[var(--career-bg)]">
-        <header className="h-16 px-6 flex items-center justify-between border-b border-[rgba(139,92,246,0.2)] sticky top-0 z-40 bg-[#0A0A0F]/85 backdrop-blur-xl">
+      <main className="flex-1 min-w-0 bg-[var(--career-bg)] w-full">
+        <header className="h-16 px-6 max-md:pl-16 flex items-center justify-between border-b border-[rgba(139,92,246,0.2)] sticky top-0 z-40 bg-[#0A0A0F]/85 backdrop-blur-xl">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-[12px] border border-[rgba(139,92,246,0.35)] flex items-center justify-center bg-[#111118]">
+            <div className="w-9 h-9 rounded-[12px] border border-[rgba(139,92,246,0.35)] md:flex items-center justify-center bg-[#111118] hidden">
               <Sparkles size={18} className="text-[var(--career-accent)]" />
             </div>
             <div className="min-w-0">
-              <div className="career-kicker">Career</div>
-              <div className="font-display font-extrabold text-lg truncate text-[var(--career-text)]">Prep Dashboard</div>
+              <div className="career-kicker hidden md:block">Career</div>
+              <div className="font-display font-extrabold text-lg truncate text-[var(--career-text)] max-md:text-base">Prep Dashboard</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -125,10 +148,11 @@ export default function CareerShell() {
           </div>
         </header>
 
-        <div className="p-6 max-sm:p-4">
+        <div className="p-6 max-sm:p-4 w-full">
           <Outlet />
         </div>
       </main>
     </div>
+    </>
   );
 }

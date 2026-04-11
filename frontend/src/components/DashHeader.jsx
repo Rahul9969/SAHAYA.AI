@@ -25,7 +25,7 @@ export default function DashHeader({ title }) {
   };
 
   return (
-    <header className="h-16 px-8 flex items-center justify-between border-b-2 border-[#E0E0E0] bg-white sticky top-0 z-50">
+    <header className="h-16 px-4 max-md:pr-3 max-md:pl-[4.2rem] sm:px-8 flex items-center justify-between border-b-2 border-[#E0E0E0] bg-white sticky top-0 z-50">
       <div className="flex items-center gap-4 min-w-0">
         <h2 className="font-display text-xl font-bold text-[#0D0D0D] truncate">{title}</h2>
         {xp && (
@@ -43,7 +43,7 @@ export default function DashHeader({ title }) {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         <button
           onClick={() => navigate('/leaderboard')}
           className="flex items-center justify-center w-10 h-10 rounded-[10px] bg-[#FFFF66] border-2 border-[#0D0D0D] text-[#0D0D0D] hover:-translate-y-0.5 hover:shadow-[2px_2px_0_#0D0D0D] transition-all cursor-pointer relative"
@@ -53,14 +53,14 @@ export default function DashHeader({ title }) {
         </button>
         <WorldToggle compact />
         <div
-        className="relative flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-[8px] border-2 border-[#E0E0E0] hover:border-[#0D0D0D] transition-colors select-none"
+        className="relative flex items-center sm:gap-2 cursor-pointer p-1.5 sm:px-3 sm:py-1.5 rounded-[8px] sm:border-2 border-transparent sm:border-[#E0E0E0] hover:border-[#0D0D0D] transition-colors select-none"
         onClick={() => setOpen(!open)}
       >
         <div className="w-8 h-8 bg-[#FFB6C1] rounded-full flex items-center justify-center font-display font-bold text-sm text-[#0D0D0D] flex-shrink-0">
           {user?.name?.[0]?.toUpperCase() || 'U'}
         </div>
-        <span className="text-sm font-semibold text-[#0D0D0D]">{user?.name || 'User'}</span>
-        <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="text-sm font-semibold text-[#0D0D0D] hidden sm:block">{user?.name || 'User'}</span>
+        <ChevronDown size={16} className={`transition-transform hidden sm:block ${open ? 'rotate-180' : ''}`} />
 
         {open && (
           <div className="absolute top-[calc(100%+8px)] right-0 w-56 bg-white border-2 border-[#0D0D0D] rounded-[16px] overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.12)] animate-fadeUp">

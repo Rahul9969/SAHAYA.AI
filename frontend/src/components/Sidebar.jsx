@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -9,6 +10,8 @@ import {
   Upload,
   Trophy,
   Sparkles,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useGamification } from '../context/GamificationContext';
@@ -27,14 +30,37 @@ export default function Sidebar() {
   const { profile } = useGamification();
   const navigate = useNavigate();
   useStudyCoachPing();
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const handleLogout = () => { logout(); navigate('/'); };
 
   return (
-    <aside className="w-60 flex-shrink-0 h-screen sticky top-0 flex flex-col bg-[#0D0D0D] px-4 py-6 overflow-y-auto">
-      {/* Logo */}
-      <NavLink to="/dashboard" className="flex flex-col gap-1 mb-9 px-2 no-underline">
-        <div className="flex items-center gap-2">
+    <>
+      {/* Mobile Hamburger Button */}
+      <button
+        onClick={() => setIsMobileOpen(!isMobileOpen)}
+        className="md:hidden fixed z-[90] top-4 left-4 p-2 bg-[#0D0D0D] text-[#FFFF66] rounded-md shadow-lg"
+      >
+        {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      {/* Mobile Backdrop */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-[80] md:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Container */}
+      <aside 
+        className={`w-60 flex-shrink-0 h-screen fixed md:sticky top-0 left-0 bg-[#0D0D0D] px-4 py-6 overflow-y-auto z-[85] transition-transform duration-300 ease-in-out flex flex-col ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        {/* Logo */}
+        <NavLink to="/dashboard" onClick={() => setIsMobileOpen(false)} className="flex flex-col gap-1 mb-9 px-2 no-underline mt-8 md:mt-0">
+          <div className="flex items-center gap-2">
           <span className="bg-[#FFFF66] text-[#0D0D0D] font-display font-extrabold text-[11px] px-2 py-0.5 rounded-[6px] leading-none">Sahaya.AI</span>
         </div>
         <span className="font-display font-extrabold text-[22px] leading-[1.05] text-white tracking-tight">Intelligent<br />Learning</span>
@@ -90,6 +116,7 @@ export default function Sidebar() {
           <span>Logout</span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

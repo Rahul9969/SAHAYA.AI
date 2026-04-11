@@ -9,6 +9,7 @@ import api from '../utils/api';
 import { useSession } from '../hooks/useSession';
 import { getCareerAnalyticsSummary } from '../utils/careerApi';
 import DailyQuestsPanel from '../components/gamification/DailyQuestsPanel';
+import AnimeWrapper from '../components/AnimeWrapper';
 const NOTEBOOK_COLORS = [
   { cover: '#FFB6C1', spine: '#f0849a' },
   { cover: '#87CEEB', spine: '#5bb8d4' },
@@ -85,10 +86,10 @@ export default function Dashboard() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 bg-[#F9F9F9]">
         <DashHeader title="Dashboard" />
-        <div className="p-8 flex-1 flex flex-col gap-7 max-sm:p-4">
+        <AnimeWrapper className="p-8 flex-1 flex flex-col gap-7 max-sm:p-4" staggerDelay={60}>
 
           {/* Welcome banner */}
-          <div className="bg-[#0D0D0D] rounded-[24px] px-8 py-7 flex items-center justify-between gap-5 animate-fadeUp max-sm:flex-col max-sm:items-start">
+          <div className="bg-[#0D0D0D] rounded-[24px] px-8 py-7 flex items-center justify-between gap-5 transition-transform max-sm:flex-col max-sm:items-start shadow-xl">
             <div>
               <h2 className="text-[22px] font-extrabold text-white mb-1.5">Welcome back, {user?.name?.split(' ')[0] || 'Scholar'}! 👋</h2>
               <p className="text-sm text-white/50">{eduData ? `${eduData.educationLevel} · ${eduData.institution} · ${subjects.length} subjects loaded` : 'Click on a notebook to upload study materials and get started.'}</p>
@@ -104,7 +105,7 @@ export default function Dashboard() {
           </div>
 
           {/* Study coach */}
-          <div className="bg-white border-2 border-[#E0E0E0] rounded-[16px] p-5 animate-fadeUp">
+          <div className="bg-white border-2 border-[#E0E0E0] rounded-[16px] p-5 shadow-sm transform transition-all hover:scale-[1.01] hover:shadow-md">
             <div className="flex items-center justify-between gap-3 mb-2">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#555555]">
                 <Bot size={16} /> Study coach
@@ -122,7 +123,7 @@ export default function Dashboard() {
           </div>
 
           {/* Career summary integrated into existing dashboard */}
-          <div className="bg-white border-2 border-[#E0E0E0] rounded-[16px] p-5 animate-fadeUp">
+          <div className="bg-white border-2 border-[#E0E0E0] rounded-[16px] p-5 shadow-sm transform transition-all hover:scale-[1.01] hover:shadow-md">
             <div className="flex items-center justify-between gap-3 mb-2">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#555555]">
                 <Sparkles size={16} /> Career snapshot
@@ -141,13 +142,13 @@ export default function Dashboard() {
           </div>
 
           {/* Daily Quests Panel */}
-          <div className="animate-fadeUp">
+          <div className="transform transition-all hover:scale-[1.01]">
              <DailyQuestsPanel world="study" />
           </div>
 
 
           {/* Global search */}
-          <div className="animate-fadeUp">
+          <div className="transform transition-all">
             <div className="flex items-center gap-3 bg-white border-2 border-[#0D0D0D] rounded-[16px] px-4 py-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
               <Search size={18} className="text-[#999999] flex-shrink-0" />
               <input type="text" placeholder="Ask any study question… e.g. Explain Newton's 3rd law"
@@ -167,7 +168,7 @@ export default function Dashboard() {
           </div>
 
           {/* Section header */}
-          <div className="animate-fadeUp">
+          <div className="transform transition-all px-2">
             <h3 className="text-xl font-extrabold mb-1">Your Subjects</h3>
             <p className="text-sm text-[#555555]">Click a notebook to access study materials, summaries, and more</p>
           </div>
@@ -197,7 +198,7 @@ export default function Dashboard() {
               <p className="text-[13px] font-semibold">Add Subject</p>
             </div>
           </div>
-        </div>
+        </AnimeWrapper>
       </div>
     </div>
   );

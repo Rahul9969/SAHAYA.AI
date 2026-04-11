@@ -83,7 +83,7 @@ export default function WorldToggle({ compact = false }) {
       )}
       {compact && (
         <span 
-          className="relative text-[13px] font-extrabold uppercase tracking-widest"
+          className="relative text-[13px] font-extrabold uppercase tracking-widest max-sm:hidden"
           style={{ color: target === 'career' ? '#FFFFFF' : '#0F172A' }}
         >
           {label}
