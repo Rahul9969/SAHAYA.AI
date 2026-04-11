@@ -18,8 +18,6 @@
 
 ## 🌟 Prototype Gallery
 
-*(Add your high-resolution prototype screenshots to the `docs/images/` folder to make this gallery shine!)*
-
 | Dashboard | Study Planner |
 | :---: | :---: |
 | <img src="./docs/images/dashboard.png" width="400" alt="Dashboard Screenshot" /> | <img src="./docs/images/study-planner.png" width="400" alt="Study Planner Screenshot" /> |
