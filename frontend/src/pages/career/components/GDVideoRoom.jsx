@@ -2,9 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
 import { useSpeechTracker } from '../../../hooks/useSpeechTracker';
 import { useFaceMonitor } from '../../../hooks/useFaceMonitor';
+import { useSocket } from '../../../context/SocketContext';
 import api from '../../../utils/api';
 
 export default function GDVideoRoom({ roomId, participants, duration, topic, onEnd }) {
+  const socket = useSocket();
   const containerRef = useRef(null);
   const localVideoRef = useRef(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -21,6 +23,25 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
   
   const { transcript, startListening, stopListening } = useSpeechTracker();
   const { metrics, startMonitoring, stopMonitoring } = useFaceMonitor(localVideoRef);
+
+  // Sync session end across all participants
+  useEffect(() => {
+    if (!socket || !roomId) return;
+
+    // Join the specific socket room for this GD
+    socket.emit('join_gd_room', { roomId });
+
+    const handleSessionEnded = () => {
+      console.log('Synchronized session end received from peer');
+      handleComplete();
+    };
+
+    socket.on('gd_session_ended_broadcast', handleSessionEnded);
+
+    return () => {
+      socket.off('gd_session_ended_broadcast', handleSessionEnded);
+    };
+  }, [socket, roomId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +137,11 @@ export default function GDVideoRoom({ roomId, participants, duration, topic, onE
     clearTimeout(timerRef.current);
     clearInterval(intervalRef.current);
     
+    // Notify others that we ended it (if they haven't ended yet)
+    if (socket && roomId) {
+      socket.emit('gd_end_session', { roomId });
+    }
+
     // Explicitly leave room gracefully before api call if we can
     try { 
       if (zpRef.current && typeof zpRef.current.leaveRoom === 'function') {

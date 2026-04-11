@@ -170,6 +170,15 @@ io.on('connection', (socket) => {
      }
   });
 
+  socket.on('join_gd_room', ({ roomId }) => {
+    socket.join(roomId);
+  });
+
+  socket.on('gd_end_session', ({ roomId }) => {
+    // Broadcast to everyone ELSE in the room that the session has ended
+    socket.to(roomId).emit('gd_session_ended_broadcast');
+  });
+
   socket.on('disconnect', () => {
     // Check if they were in a pending ready room
     for (const [roomId, room] of Object.entries(gdReadyRooms)) {

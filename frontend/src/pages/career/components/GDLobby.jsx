@@ -4,17 +4,15 @@ import { useSocket } from '../../../context/SocketContext';
 import { User } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError(error) { return { hasError: true }; }
+  componentDidCatch(error, errorInfo) {
+    console.error("GDLobby crash caught:", error, errorInfo);
+  }
   render() {
     if (this.state.hasError) {
-      return (
-        <div className="p-8 bg-red-900/40 text-red-100 rounded-xl max-w-lg mx-auto mt-20 border border-red-500">
-          <h2 className="text-2xl font-bold mb-4">CRASH: Video Room Failed to Load</h2>
-          <pre className="text-xs whitespace-pre-wrap">{this.state.error?.toString()}</pre>
-          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-600 rounded">Reload Page</button>
-        </div>
-      );
+      // Return null to keep errors in the console and off the screen
+      return null;
     }
     return this.props.children;
   }
