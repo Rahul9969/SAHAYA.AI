@@ -36,8 +36,14 @@ export default function ExecutionAnimator({ trace, code }) {
     // Scroll to current line
     useEffect(() => {
         if (codeRef.current && step) {
+            const container = codeRef.current.parentElement;
             const lineElement = codeRef.current.querySelector('[data-line="' + step.line + '"]');
-            lineElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (container && lineElement) {
+                container.scrollTo({
+                    top: lineElement.offsetTop - container.clientHeight / 2 + 10,
+                    behavior: 'smooth'
+                });
+            }
         }
     }, [step]);
 
@@ -49,14 +55,28 @@ export default function ExecutionAnimator({ trace, code }) {
         const synth = window.speechSynthesis;
         synth.cancel(); // Cancel any ongoing speech immediately
 
-        const utterance = new SpeechSynthesisUtterance(String(step.description || '').slice(0, 500));
+        let speechText = step.description || '';
+        const actualCode = codeLines[step.line - 1]?.trim();
+        
+        // Read the actual code line for much better context instead of generic "Call statement"
+        if (actualCode && actualCode.length > 1 && !speechText.toLowerCase().includes('error')) {
+             speechText = actualCode
+                .replace(/==/g, ' equals ')
+                .replace(/<=/g, ' less than or equal to ')
+                .replace(/>=/g, ' greater than or equal to ')
+                .replace(/!=/g, ' not equal to ')
+                .replace(/\/\//g, ' integer division ')
+                .replace(/=/g, ' equals ');
+        }
+
+        const utterance = new SpeechSynthesisUtterance(String(speechText).slice(0, 500));
         utterance.rate = 1.1; // Slightly faster for tracing
         synth.speak(utterance);
 
         return () => {
             synth.cancel();
         };
-    }, [currentStep, muted, step]);
+    }, [currentStep, muted, step, codeLines]);
 
     const handlePlayPause = () => {
         if (!isPlaying && currentStep >= trace.steps.length - 1) {
