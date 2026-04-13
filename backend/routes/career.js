@@ -607,6 +607,7 @@ Return STRICT JSON only with this exact shape:
 }
 Rules:
 - voiceText must teach WHY, stepText states WHAT (keep them different).
+- steps MUST trace the algorithm ITERATION BY ITERATION. DO NOT skip loops or summarize! If a loop runs 10 times, generate steps for EVERY iteration. Show granular pointer movements step-by-step to create detailed array visualizations.
 - steps must be accurate for ONE chosen example (use first example).
 - Keep steps <= 60 for performance.`;
 
@@ -616,7 +617,7 @@ ${fetched ? JSON.stringify(fetched).slice(0, 18000) : '(none)'}
 
 If fetched.contentHtml exists, extract clean text problem statement, constraints, and examples from it.
 Then pick the best pattern, produce an accurate step-by-step visualization script for example #1, and produce the optimal Python solution.
-CRITICAL: Do NOT output a class like 'class Solution:'. You must output a raw function. Then, at the very end of the code, you MUST append a driver block that assigns sample inputs from example #1, calls your function on those inputs, and prints the result. If you don't do this, the code execution and tracing will silently fail!`;
+CRITICAL: Do NOT output a class like 'class Solution:'. You must output a raw function. Then, at the very end of the code, you MUST append a driver block that assigns sample inputs from example #1, calls your function on those inputs, and EXPLICITLY PRINTS the result using 'print()'. If you don't use 'print()', the visualizer will show 'No output'!`;
 
   try {
     const analysis = await callGeminiStructuredJSON(system, prompt, 8000);

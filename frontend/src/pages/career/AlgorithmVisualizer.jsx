@@ -789,15 +789,15 @@ export default function AlgorithmVisualizer() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 flex flex-col">
               <StackViz stack={step?.state?.stack || []} />
               <QueueViz queue={step?.state?.queue || []} />
-              {(step?.voiceText || voiceCache[idx]) ? (
-                <div className="rounded-xl border border-[rgba(6,182,212,0.25)] bg-[rgba(6,182,212,0.06)] p-4">
-                  <div className="career-kicker">Teacher voice (text)</div>
-                  <div className="text-sm text-[var(--career-text)] mt-2 whitespace-pre-wrap">{step.voiceText || voiceCache[idx]}</div>
+              <div className="rounded-xl border border-[rgba(6,182,212,0.25)] bg-[rgba(6,182,212,0.06)] p-4 min-h-[160px]">
+                <div className="career-kicker">Teacher voice (text)</div>
+                <div className="text-sm text-[var(--career-text)] mt-2 whitespace-pre-wrap">
+                  {(step?.voiceText || voiceCache[idx]) ? (step?.voiceText || voiceCache[idx]) : <span className="text-[var(--career-muted)] italic">No teacher context for this step.</span>}
                 </div>
-              ) : null}
+              </div>
             </div>
           </div>
         </div>
