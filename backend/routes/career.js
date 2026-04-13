@@ -616,7 +616,7 @@ ${fetched ? JSON.stringify(fetched).slice(0, 18000) : '(none)'}
 
 If fetched.contentHtml exists, extract clean text problem statement, constraints, and examples from it.
 Then pick the best pattern, produce an accurate step-by-step visualization script for example #1, and produce the optimal Python solution.
-CRITICAL: At the end of the Python code, you MUST append a driver block that assigns sample inputs from example #1, calls the optimal solution function/method on those inputs, and prints the result, so the code is fully runnable and self-contained.`;
+CRITICAL: Do NOT output a class like 'class Solution:'. You must output a raw function. Then, at the very end of the code, you MUST append a driver block that assigns sample inputs from example #1, calls your function on those inputs, and prints the result. If you don't do this, the code execution and tracing will silently fail!`;
 
   try {
     const analysis = await callGeminiStructuredJSON(system, prompt, 8000);
