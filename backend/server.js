@@ -44,7 +44,9 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:5005',
-  'http://192.168.7.156:5005'
+  'http://localhost:5173',
+  'http://192.168.7.156:5005',
+  'https://sahaya-ai-eight.vercel.app'
 ].filter(Boolean);
 
 app.use(cors({
@@ -101,7 +103,13 @@ const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5005',
+    origin: function(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   }
 });
