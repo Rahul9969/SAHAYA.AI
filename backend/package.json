@@ -9,7 +9,7 @@
     "dev": "nodemon server.js",
     "build": "npm install && npm run setup-ai",
     "postinstall": "npm run setup-ai",
-    "setup-ai": "pip3 install -r ai_service/requirements.txt --break-system-packages || pip install -r ai_service/requirements.txt --break-system-packages",
+    "setup-ai": "node scripts/setup-python.js",
     "db:migrate-to-supabase": "node scripts/migrate-json-to-supabase.mjs"
   },
   "dependencies": {
