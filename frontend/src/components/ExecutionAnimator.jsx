@@ -5,6 +5,7 @@ export default function ExecutionAnimator({ trace, code }) {
     const [currentStep, setCurrentStep] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [playSpeed, setPlaySpeed] = useState(1000); // ms per step
+    const [muted, setMuted] = useState(true); // AI voice starts muted by default
     const codeRef = useRef(null);
     const intervalRef = useRef(null);
 
@@ -40,8 +41,31 @@ export default function ExecutionAnimator({ trace, code }) {
         }
     }, [step]);
 
+    // AI Voice Synthesis
+    useEffect(() => {
+        if (!step || muted) return;
+        if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+        const synth = window.speechSynthesis;
+        synth.cancel(); // Cancel any ongoing speech immediately
+
+        const utterance = new SpeechSynthesisUtterance(String(step.description || '').slice(0, 500));
+        utterance.rate = 1.1; // Slightly faster for tracing
+        synth.speak(utterance);
+
+        return () => {
+            synth.cancel();
+        };
+    }, [currentStep, muted, step]);
+
     const handlePlayPause = () => {
-        setIsPlaying(!isPlaying);
+        if (!isPlaying && currentStep >= trace.steps.length - 1) {
+            // Replay from beginning
+            setCurrentStep(0);
+            setIsPlaying(true);
+        } else {
+            setIsPlaying(!isPlaying);
+        }
     };
 
     const handleStepForward = () => {
@@ -126,11 +150,15 @@ export default function ExecutionAnimator({ trace, code }) {
                     <button
                         onClick={handlePlayPause}
                         className="p-2 rounded-full bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-400 transition-colors"
-                        title={isPlaying ? 'Pause' : 'Play'}
+                        title={isPlaying ? 'Pause' : (!isPlaying && currentStep >= trace.steps.length - 1 ? 'Replay' : 'Play')}
                     >
                         {isPlaying ? (
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        ) : (!isPlaying && currentStep >= trace.steps.length - 1) ? (
+                            <svg className="w-4 h-4 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
                         ) : (
                             <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
@@ -152,13 +180,32 @@ export default function ExecutionAnimator({ trace, code }) {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {/* Voice control */}
+                    <button
+                        onClick={() => setMuted(!muted)}
+                        className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs text-gray-300"
+                        title={muted ? 'Enable Voice' : 'Disable Voice'}
+                    >
+                        {muted ? (
+                           <svg className="w-4 h-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clipRule="evenodd" />
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                           </svg>
+                        ) : (
+                           <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                           </svg>
+                        )}
+                        <span>{muted ? 'Muted' : 'Voice'}</span>
+                    </button>
+
                     {/* Speed control */}
                     <div className="flex items-center gap-2 text-xs">
-                        <span className="text-white/60">Speed:</span>
+                        <span className="text-gray-400">Speed:</span>
                         <select
                             value={playSpeed}
                             onChange={(e) => setPlaySpeed(Number(e.target.value))}
-                            className="px-2 py-1 rounded bg-black/40 border border-white/10 text-white outline-none"
+                            className="px-2 py-1 rounded bg-gray-900 border border-gray-700 text-gray-100 outline-none"
                         >
                             <option value={2000}>0.5x</option>
                             <option value={1000}>1x</option>
